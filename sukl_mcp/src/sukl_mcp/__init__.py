@@ -1,6 +1,16 @@
-"""SÚKL MCP Server - FastMCP server pro přístup k databázi léčiv."""
+"""
+SÚKL MCP Server - Production-ready FastMCP server pro přístup k české databázi léčivých přípravků.
 
-from .client import SUKLClient, SUKLConfig
+Poskytuje přístup k 68,248 léčivým přípravkům z SÚKL Open Data přes Model Context Protocol (MCP).
+"""
+
+from .client_csv import SUKLClient, SUKLConfig, get_sukl_client
+from .exceptions import (
+    SUKLDataError,
+    SUKLException,
+    SUKLValidationError,
+    SUKLZipBombError,
+)
 from .models import (
     AvailabilityInfo,
     MedicineDetail,
@@ -12,12 +22,16 @@ from .models import (
 )
 from .server import mcp
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 __all__ = [
+    # Server
     "mcp",
+    # Client
     "SUKLClient",
     "SUKLConfig",
+    "get_sukl_client",
+    # Models
     "MedicineSearchResult",
     "MedicineDetail",
     "PharmacyInfo",
@@ -25,4 +39,9 @@ __all__ = [
     "ReimbursementInfo",
     "PILContent",
     "SearchResponse",
+    # Exceptions
+    "SUKLException",
+    "SUKLValidationError",
+    "SUKLZipBombError",
+    "SUKLDataError",
 ]

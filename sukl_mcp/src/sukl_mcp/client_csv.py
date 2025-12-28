@@ -4,7 +4,9 @@ CSV-based klient pro SÚKL Open Data.
 Načítá data z DLP CSV souborů a poskytuje in-memory vyhledávání.
 """
 
+import asyncio
 import logging
+import os
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -12,23 +14,48 @@ from typing import Any, Optional
 
 import httpx
 import pandas as pd
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from .exceptions import SUKLValidationError, SUKLZipBombError
 
 logger = logging.getLogger(__name__)
 
 
+def _get_opendata_url() -> str:
+    """Get SÚKL Open Data URL from ENV or default."""
+    return os.getenv(
+        "SUKL_OPENDATA_URL",
+        "https://opendata.sukl.cz/soubory/SOD20251223/DLP20251223.zip",
+    )
+
+
+def _get_cache_dir() -> Path:
+    """Get cache directory from ENV or default."""
+    return Path(os.getenv("SUKL_CACHE_DIR", "/tmp/sukl_dlp_cache"))
+
+
+def _get_data_dir() -> Path:
+    """Get data directory from ENV or default."""
+    return Path(os.getenv("SUKL_DATA_DIR", "/tmp/sukl_dlp_data"))
+
+
+def _get_download_timeout() -> float:
+    """Get download timeout from ENV or default."""
+    return float(os.getenv("SUKL_DOWNLOAD_TIMEOUT", "120.0"))
+
+
 class SUKLConfig(BaseModel):
-    """Konfigurace SÚKL klienta."""
+    """Konfigurace SÚKL klienta (konfigurovatelné přes ENV)."""
 
     # Open Data URL
-    opendata_dlp_url: str = "https://opendata.sukl.cz/soubory/SOD20251223/DLP20251223.zip"
+    opendata_dlp_url: str = Field(default_factory=_get_opendata_url)
 
     # Local cache
-    cache_dir: Path = Path("/tmp/sukl_dlp_cache")
-    data_dir: Path = Path("/tmp/sukl_dlp_data")
+    cache_dir: Path = Field(default_factory=_get_cache_dir)
+    data_dir: Path = Field(default_factory=_get_data_dir)
 
     # Download timeout
-    download_timeout: float = 120.0
+    download_timeout: float = Field(default_factory=_get_download_timeout)
 
 
 class SUKLDataLoader:
@@ -58,7 +85,7 @@ class SUKLDataLoader:
 
         # Rozbal ZIP
         if not (self.config.data_dir / "dlp_lecivepripravky.csv").exists():
-            self._extract_zip(zip_path)
+            await self._extract_zip(zip_path)
 
         # Načti klíčové CSV soubory
         await self._load_csvs()
@@ -80,17 +107,32 @@ class SUKLDataLoader:
 
         logger.info(f"Staženo: {zip_path} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
 
-    def _extract_zip(self, zip_path: Path) -> None:
-        """Rozbal ZIP soubor."""
+    async def _extract_zip(self, zip_path: Path) -> None:
+        """Rozbal ZIP soubor (async přes executor + ZIP bomb protection)."""
         logger.info(f"Rozbaluji {zip_path}...")
 
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(self.config.data_dir)
+        def _sync_extract():
+            """Synchronní extrakce s bezpečnostní kontrolou."""
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                # ZIP bomb protection - kontrola celkové velikosti
+                total_size = sum(info.file_size for info in zip_ref.infolist())
+                max_size = 5 * 1024 * 1024 * 1024  # 5 GB
+                if total_size > max_size:
+                    raise SUKLZipBombError(
+                        f"ZIP příliš velký: {total_size / 1024 / 1024:.1f} MB "
+                        f"(maximum: {max_size / 1024 / 1024:.1f} MB)"
+                    )
+
+                zip_ref.extractall(self.config.data_dir)
+
+        # Spusť v executoru aby neblokovala event loop
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _sync_extract)
 
         logger.info(f"Rozbaleno do {self.config.data_dir}")
 
     async def _load_csvs(self) -> None:
-        """Načti CSV soubory do pandas DataFrames."""
+        """Načti CSV soubory paralelně do pandas DataFrames."""
         logger.info("Načítám CSV soubory...")
 
         # Klíčové tabulky
@@ -102,15 +144,29 @@ class SUKLDataLoader:
             'dlp_nazvydokumentu',   # Dokumenty (PIL)
         ]
 
-        for table in tables:
+        def _load_single_csv(table: str) -> tuple[str, Optional[pd.DataFrame]]:
+            """Načti jeden CSV soubor (synchronní funkce pro executor)."""
             csv_path = self.config.data_dir / f"{table}.csv"
-            if csv_path.exists():
-                df = pd.read_csv(
-                    csv_path,
-                    sep=';',
-                    encoding='cp1250',
-                    low_memory=False
-                )
+            if not csv_path.exists():
+                return (table, None)
+
+            df = pd.read_csv(
+                csv_path,
+                sep=';',
+                encoding='cp1250',
+                low_memory=False
+            )
+            return (table, df)
+
+        # Paralelní načítání všech CSV souborů
+        loop = asyncio.get_event_loop()
+        results = await asyncio.gather(
+            *[loop.run_in_executor(None, _load_single_csv, t) for t in tables]
+        )
+
+        # Uložení načtených dat a logování
+        for table, df in results:
+            if df is not None:
                 self._data[table] = df
                 logger.info(f"  ✓ {table}: {len(df)} záznamů")
             else:
@@ -155,6 +211,16 @@ class SUKLClient:
         only_reimbursed: bool = False,
     ) -> list[dict]:
         """Vyhledej léčivé přípravky podle názvu."""
+        # Input validace
+        if not query or not query.strip():
+            raise SUKLValidationError("Query nesmí být prázdný")
+        if len(query) > 200:
+            raise SUKLValidationError(f"Query příliš dlouhý: {len(query)} znaků (maximum: 200)")
+        if not (1 <= limit <= 100):
+            raise SUKLValidationError(f"Limit musí být 1-100 (zadáno: {limit})")
+
+        query = query.strip()
+
         if not self._initialized:
             await self.initialize()
 
@@ -162,8 +228,8 @@ class SUKLClient:
         if df is None:
             return []
 
-        # Case-insensitive vyhledávání v názvu
-        mask = df['NAZEV'].str.contains(query, case=False, na=False)
+        # Case-insensitive vyhledávání v názvu (regex=False proti injection)
+        mask = df['NAZEV'].str.contains(query, case=False, na=False, regex=False)
         results = df[mask]
 
         # Aplikuj filtry
@@ -183,6 +249,15 @@ class SUKLClient:
 
     async def get_medicine_detail(self, sukl_code: str) -> Optional[dict]:
         """Získej detail léčivého přípravku."""
+        # Input validace
+        if not sukl_code or not sukl_code.strip():
+            raise SUKLValidationError("SÚKL kód nesmí být prázdný")
+        sukl_code = sukl_code.strip()
+        if not sukl_code.isdigit():
+            raise SUKLValidationError(f"SÚKL kód musí být číselný (zadáno: {sukl_code})")
+        if len(sukl_code) > 7:
+            raise SUKLValidationError(f"SÚKL kód příliš dlouhý: {len(sukl_code)} znaků (maximum: 7)")
+
         if not self._initialized:
             await self.initialize()
 
@@ -231,6 +306,12 @@ class SUKLClient:
 
     async def get_atc_groups(self, atc_prefix: Optional[str] = None) -> list[dict]:
         """Získej ATC skupiny podle prefixu."""
+        # Input validace
+        if atc_prefix:
+            atc_prefix = atc_prefix.strip()
+            if len(atc_prefix) > 7:
+                raise SUKLValidationError(f"ATC prefix příliš dlouhý: {len(atc_prefix)} znaků (maximum: 7)")
+
         if not self._initialized:
             await self.initialize()
 
@@ -253,16 +334,26 @@ class SUKLClient:
         self._initialized = False
 
 
-# Globální instance klienta
+# Globální instance klienta s thread-safe inicializací
 _client: Optional[SUKLClient] = None
+_client_lock: asyncio.Lock = asyncio.Lock()
 
 
 async def get_sukl_client() -> SUKLClient:
-    """Získej globální instanci SÚKL klienta."""
+    """Získej globální instanci SÚKL klienta (thread-safe)."""
     global _client
-    if _client is None:
-        _client = SUKLClient()
-        await _client.initialize()
+
+    # Rychlá kontrola bez zámku (double-checked locking)
+    if _client is not None:
+        return _client
+
+    # Kritická sekce - zajištění jediné instance
+    async with _client_lock:
+        # Opětovná kontrola v zámku
+        if _client is None:
+            _client = SUKLClient()
+            await _client.initialize()
+
     return _client
 
 

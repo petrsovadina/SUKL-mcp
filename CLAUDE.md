@@ -4,101 +4,250 @@ Tento soubor poskytuje pokyny pro Claude Code (claude.ai/code) při práci s kó
 
 ## Přehled projektu
 
-Jedná se o **dvoujazyčný šablonový MCP server** obsahující:
-
-1. **TypeScript/JavaScript FastMCP šablonu** (kořenový adresář) – původní šablonu pro vytváření MCP serverů
-2. **Python SÚKL MCP server** (adresář SUKL-FastMCP/) – komplexní MCP server pro přístup k české farmaceutické databázi (SÚKL)
+**Python SÚKL MCP Server** - Produkční MCP server pro přístup k české farmaceutické databázi SÚKL.
 
 ## Architektura
 
-### TypeScript Boilerplate (kořenový adresář)
-- **Vstupní bod**: `src/server.ts` – vytvoří instanci FastMCP serveru
-- **Vzor**: Nástroje jsou implementovány jako samostatné funkce (např. `src/add.ts`) a registrovány pomocí `server.addTool()`
-- **Validace schématu**: Používá Zod pro validaci parametrů
-- **Komponenty serveru**:
-  - Nástroje: Funkce dostupné pro AI klienty (např. `add`)
-  - Zdroje: Zdroje dat (např. protokoly aplikací)
-  - Výzvy: Předkonfigurované šablony výzev (např. git-commit)
+### Struktura projektu
+```
+sukl_mcp/
+├── src/sukl_mcp/
+│   ├── server.py       # FastMCP server s 7 MCP tools
+│   ├── client_csv.py   # CSV data loader a klient
+│   ├── models.py       # Pydantic modely pro validaci
+│   ├── exceptions.py   # Custom exception types
+│   └── __init__.py     # Public API exports
+├── tests/
+│   ├── test_validation.py  # Input validation testy
+│   └── test_async_io.py    # Async I/O testy
+└── pyproject.toml      # Konfigurace projektu
+```
 
-### Python SÚKL Server (SUKL-FastMCP/)
-- **Architektura**: Vícevrstvý design
-  - `client.py`: HTTP klient pro SÚKL REST API a Open Data CSV
-  - `models.py`: Pydantic modely pro ověřování dat
-  - `server.py`: FastMCP server s více než 7 MCP nástroji
-- **Klíčové funkce**:
-  - Vyhledávání léků podle názvu, složky nebo ATC kódu
-  - Vyhledávání lékáren s filtry
-  - Informace o úhradách a dostupnosti
-  - Přístup k PIL (příbalové informační letáky)
-- **Zdroje dat**:
-  - REST API: `prehledy.sukl.cz` (v reálném čase)
-  - Open Data: `opendata.sukl.cz` (měsíční aktualizace)
+### Datový tok
+```
+SÚKL Open Data (ZIP) → SUKLDataLoader → pandas DataFrames →
+SUKLClient (search/filter) → FastMCP Server (7 tools) → AI Agent
+```
+
+### Klíčové komponenty
+
+**`client_csv.py`** - Data loader a klient:
+- `SUKLDataLoader`: Stahuje a extrahuje ZIP (async), načítá CSV do pandas
+- `SUKLClient`: Vyhledávání léků, detail přípravku, ATC skupiny
+- `get_sukl_client()`: Thread-safe singleton s asyncio.Lock
+- Bezpečnost: ZIP bomb protection, regex injection prevention
+
+**`server.py`** - FastMCP server:
+- 7 MCP tools: search_medicine, get_medicine_details, get_pil_content, check_availability, get_reimbursement, find_pharmacies, get_atc_info
+- Lifecycle management přes `@asynccontextmanager`
+- Pydantic validace všech vstupů
+- Input validace: délka query, formát SÚKL kódu, rozsah limitů
+
+**`models.py`** - Type-safe datové modely:
+- MedicineSearchResult, MedicineDetail, ATCGroup, PharmacyInfo
+- Pydantic 2.0+ s runtime validací
 
 ## Vývojové příkazy
 
-### TypeScript/JavaScript
+### Instalace a spuštění
 ```bash
-npm install              # Instalace závislostí
-npm run dev             # Spuštění s FastMCP CLI (interaktivní)
-npm run start           # Spuštění serveru přímo
-npm run build           # Kompilace TypeScriptu
-npm run lint            # Kontrola kvality kódu
-npm run format          # Automatické formátování kódu
-npm run test            # Spuštění testů (zaměření na implementaci nástroje, nikoli na protokol MCP)
-```
-
-### Python (server SÚKL)
-```bash
-# Nastavení virtuálního prostředí
+# Vytvoření virtuálního prostředí
 python3 -m venv venv
 source venv/bin/activate  # macOS/Linux
 # venv\Scripts\activate   # Windows
 
-# Instalace závislostí
-pip install „fastmcp<3“ httpx pydantic
+# Instalace v režimu vývoje
+cd sukl_mcp
+pip install -e ".[dev]"
 
-# Spuštění testovacího skriptu
-python test_fastmcp_server.py
+# Spuštění serveru
+python -m sukl_mcp.server
+```
 
-# Vývoj v SUKL-FastMCP/sukl-mcp-server/
-pip install -e „.[dev]“
+### Testování
+```bash
+# Spuštění všech testů
 pytest tests/ -v
+
+# S coverage reportem
+pytest tests/ -v --cov=src/sukl_mcp --cov-report=term-missing
+
+# Konkrétní test
+pytest tests/test_validation.py -v
+```
+
+### Code quality
+```bash
+# Formátování kódu
+black src/
+
+# Linting
+ruff check src/
+
+# Type checking
+mypy src/
 ```
 
 ## Klíčové vzory
 
-### Přidání nových nástrojů (TypeScript)
-1. Vytvořte implementační funkci v samostatném souboru (např. `src/myTool.ts`)
-2. Zaregistrujte v `src/server.ts` pomocí `server.addTool()`
-3. Definujte parametry pomocí schématu Zod
-4. Přidejte test v `src/*.test.ts`
+### Přidání nových MCP tools
+1. **Definice tool funkce** v `server.py`:
+```python
+@mcp.tool()
+async def my_new_tool(query: str, limit: int = 10) -> dict:
+    """Popis nástroje pro AI agenta."""
+    # Input validace
+    if not query or len(query) > 200:
+        raise ValueError("Neplatný query")
 
-### Přenos serveru FastMCP
-- Výchozí: `stdio` (standardní vstup/výstup pro lokální použití)
-- Alternativa: Nakonfigurujte pro HTTP/SSE pro vzdálené nasazení.
+    # Získání klienta
+    client = await get_sukl_client()
 
-## CI/CD
+    # Business logika
+    results = await client.my_method(query, limit)
+    return {"results": results}
+```
 
-Používá semantic-release pro automatické publikování NPM:
-- Běží na větvi `main`.
-- Vyžaduje tajný klíč `NPM_TOKEN`.
-- Oprávnění pracovního postupu: „Čtení a zápis“.
-- Konvenční commity spouštějí zvýšení verze.
+2. **Přidání metody do SUKLClient** v `client_csv.py`:
+```python
+async def my_method(self, query: str, limit: int) -> list[dict]:
+    """Implementace business logiky."""
+    df = self._data.get("table_name")
+    # Filtering, searching, atd.
+    return df.head(limit).to_dict('records')
+```
 
-## Filozofie testování
+3. **Testy** v `tests/test_my_tool.py`:
+```python
+@pytest.mark.asyncio
+async def test_my_new_tool():
+    result = await my_new_tool("test", limit=5)
+    assert len(result["results"]) <= 5
+```
 
-**Testujte své nástroje, ne protokol MCP**. FastMCP zajišťuje dodržování protokolu – zaměřte testy na obchodní logiku (např. chování funkce `add`, nikoli na obal nástroje MCP).
+### Async I/O best practices
 
-## Poznámky specifické pro SÚKL
+**Blokující operace musí běžet v executoru:**
+```python
+import asyncio
 
-Server SÚKL (`SUKL-FastMCP/`) je implementace připravená pro produkční použití, která demonstruje:
-- Komplexní HTTP klient s ukládáním do mezipaměti, omezením rychlosti, logikou opakování
-- Parsování CSV ze ZIP archivů (otevřená data)
-- Pydantic modely pro typovou bezpečnost
-- Více typů nástrojů MCP (vyhledávání, načítání detailů, filtrování)
+async def blocking_operation():
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, sync_function)
+    return result
+```
 
-Slouží jako referenční implementace pro budování datově náročných serverů MCP.
+**Paralelní async operace:**
+```python
+results = await asyncio.gather(
+    operation1(),
+    operation2(),
+    operation3()
+)
+```
 
-## Použití virtuálního prostředí
+### Bezpečnostní vzory
 
-Při práci s kódem Python vždy používejte virtuální prostředí umístěné v `venv/`. Aktivujte jej před spuštěním příkazů Python nebo instalací balíčků, abyste se vyhnuli konfliktům balíčků v celém systému.
+**Input validace:**
+```python
+if len(query) > 200:
+    raise SUKLValidationError("Query příliš dlouhý")
+if not sukl_code.isdigit():
+    raise SUKLValidationError("SÚKL kód musí být číselný")
+```
+
+**Regex injection prevention:**
+```python
+# ŠPATNĚ:
+df['NAZEV'].str.contains(user_input, case=False, na=False)
+
+# SPRÁVNĚ:
+df['NAZEV'].str.contains(user_input, case=False, na=False, regex=False)
+```
+
+**ZIP bomb protection:**
+```python
+total_size = sum(info.file_size for info in zip_ref.infolist())
+if total_size > 5 * 1024 * 1024 * 1024:  # 5 GB
+    raise SUKLZipBombError(f"ZIP příliš velký: {total_size}")
+```
+
+**Thread-safe singleton:**
+```python
+_client: Optional[SUKLClient] = None
+_client_lock: asyncio.Lock = asyncio.Lock()
+
+async def get_sukl_client() -> SUKLClient:
+    global _client
+    if _client is not None:
+        return _client
+
+    async with _client_lock:
+        if _client is None:
+            _client = SUKLClient()
+            await _client.initialize()
+    return _client
+```
+
+## Konfigurace prostředí
+
+### Environment variables
+```bash
+# Data paths
+export SUKL_CACHE_DIR=/var/cache/sukl
+export SUKL_DATA_DIR=/var/lib/sukl
+
+# Data source
+export SUKL_OPENDATA_URL=https://opendata.sukl.cz/soubory/SOD20251223/DLP20251223.zip
+export SUKL_DOWNLOAD_TIMEOUT=120.0
+
+# Logging
+export SUKL_LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
+```
+
+### Použití v Claude Desktop
+Přidejte do `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "sukl": {
+      "command": "python",
+      "args": ["-m", "sukl_mcp.server"],
+      "env": {
+        "PYTHONPATH": "/cesta/k/fastmcp-boilerplate/sukl_mcp/src"
+      }
+    }
+  }
+}
+```
+
+## Testování
+
+**Filozofie**: Testujte business logiku, ne FastMCP protokol. Framework zajišťuje MCP compliance.
+
+**Zaměřte se na:**
+- Input validaci (test_validation.py)
+- Async I/O chování (test_async_io.py)
+- Data transformace
+- Error handling
+
+## Poznámky pro vývoj
+
+**Vždy používejte virtuální prostředí:**
+```bash
+source venv/bin/activate  # před každou prací
+```
+
+**Type safety:**
+- Všechny funkce mají type hints
+- `mypy` kontroluje staticky
+- Pydantic validuje runtime
+
+**Performance:**
+- CSV data načítána jednou při inicializaci (68,248 záznamů)
+- Pandas in-memory queries (rychlejší než SQL pro tento rozsah)
+- Async I/O pro ZIP download a extraction
+
+**Data freshness:**
+- SÚKL data aktualizována měsíčně
+- ZIP cache v `/tmp` - smazat pro refresh
