@@ -5,6 +5,35 @@ Všechny významné změny v tomto projektu budou dokumentovány v tomto souboru
 Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 a projekt dodržuje [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2024-12-28
+
+### Added
+
+**Smithery Platform Support:**
+- ✅ Docker konfigurace s python:3.10-slim base image
+- ✅ `.dockerignore` pro optimalizaci build procesu
+- ✅ `smithery.yaml` deployment konfigurace
+- ✅ HTTP/Streamable-HTTP transport support
+- ✅ Automatická detekce transportu (stdio vs HTTP)
+- ✅ Health check endpoint pro monitoring
+- ✅ Multi-stage Docker build pro minimální image size
+- ✅ Non-root user v Docker kontejneru (security best practice)
+- ✅ `SMITHERY_DEPLOYMENT.md` - kompletní deployment guide
+
+**Server Enhancements:**
+- ✅ Transport auto-detection via `MCP_TRANSPORT` environment variable
+- ✅ Configurable host/port for HTTP transport (`MCP_HOST`, `MCP_PORT`)
+- ✅ Dual deployment support - FastMCP Cloud (stdio) + Smithery (HTTP)
+
+**Documentation:**
+- ✅ README.md - přidána sekce "Nasazení na Smithery"
+- ✅ DEPLOYMENT.md - odkaz na Smithery deployment guide
+- ✅ Kompletní Smithery deployment dokumentace
+
+### Changed
+- 📦 `server.py` - rozšířená `main()` funkce o transport detection
+- 📦 Project podporuje 2 deployment platformy bez úprav kódu
+
 ## [2.0.0] - 2024-12-28
 
 ### BREAKING CHANGES

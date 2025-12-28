@@ -84,6 +84,32 @@ Přidejte do `claude_desktop_config.json`:
 }
 ```
 
+### Nasazení na Smithery
+
+Server je také připraven pro nasazení na [Smithery](https://smithery.ai):
+
+```bash
+# 1. Build Docker image lokálně
+cd sukl_mcp
+docker build -t sukl-mcp:2.0.0 .
+
+# 2. Test lokálně
+docker run -p 8000:8000 -e MCP_TRANSPORT=http sukl-mcp:2.0.0
+
+# 3. Deploy na Smithery (vyžaduje Smithery CLI)
+smithery deploy
+```
+
+**Konfigurace:** Projekt obsahuje `smithery.yaml` s HTTP transport konfigurací:
+- ✅ Docker kontejner s python:3.10-slim
+- ✅ HTTP/Streamable-HTTP transport
+- ✅ Konfigurovatelné cache paths a timeouty
+- ✅ Health checks a monitoring
+
+**Poznámka:** Smithery používá Docker kontejnery a HTTP transport. Pro lokální vývoj doporučujeme STDIO transport (výchozí).
+
+Detailní průvodce: [SMITHERY_DEPLOYMENT.md](SMITHERY_DEPLOYMENT.md)
+
 ### Použití jako Python knihovny
 
 ```python
