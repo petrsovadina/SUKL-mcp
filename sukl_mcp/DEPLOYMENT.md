@@ -268,6 +268,12 @@ Máš problémy s deploymentem?
 3. **Otevři issue:** https://github.com/your-org/fastmcp-boilerplate/issues
 4. **FastMCP Discord:** https://discord.gg/fastmcp
 
+## Smithery Platform
+
+Pro nasazení na Smithery viz samostatný guide: [SMITHERY_DEPLOYMENT.md](SMITHERY_DEPLOYMENT.md)
+
+Smithery používá Docker kontejnery a HTTP transport na rozdíl od FastMCP Cloud (stdio). Oba přístupy jsou plně podporovány a server automaticky detekuje správný transport podle environment proměnné `MCP_TRANSPORT`.
+
 ---
 
 **Poslední aktualizace:** 28. prosince 2024
