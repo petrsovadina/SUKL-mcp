@@ -281,22 +281,21 @@ async def get_reimbursement(sukl_code: str) -> ReimbursementInfo | None:
     if not detail:
         return None
 
-    is_reimbursed = detail.get("uhrada") == "ano"
+    # Pro teď vrátíme základní informace, úhrady jsou v separátních CSV souborech
+    is_reimbursed = False  # TODO: získat z dlp_cau_scau.csv
 
     return ReimbursementInfo(
         sukl_code=sukl_code,
-        medicine_name=detail.get("nazev", ""),
+        medicine_name=detail.get("NAZEV", ""),
         is_reimbursed=is_reimbursed,
-        reimbursement_group=detail.get("uhradova_skupina"),
-        max_producer_price=float(detail["max_cena_vyrobce"])
-        if detail.get("max_cena_vyrobce")
-        else None,
-        max_retail_price=float(detail["max_cena"]) if detail.get("max_cena") else None,
-        reimbursement_amount=float(detail["uhrada_castka"]) if detail.get("uhrada_castka") else None,
-        patient_copay=float(detail["doplatek"]) if detail.get("doplatek") else None,
-        has_indication_limit=detail.get("indikacni_omezeni") == "ano",
-        indication_limit_text=detail.get("text_indikacniho_omezeni"),
-        specialist_only=detail.get("specialista") == "ano",
+        reimbursement_group=None,  # TODO: z CAU tabulky
+        max_producer_price=None,
+        max_retail_price=None,
+        reimbursement_amount=None,
+        patient_copay=None,
+        has_indication_limit=False,
+        indication_limit_text=None,
+        specialist_only=False,
     )
 
 
