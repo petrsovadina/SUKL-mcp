@@ -415,8 +415,23 @@ async def get_atc_info(atc_code: str) -> dict:
 
 
 def main():
-    """Spusť MCP server."""
-    mcp.run()
+    """Spusť MCP server s automatickou detekcí transportu."""
+    import os
+
+    # Detekce transportu z ENV
+    transport = os.getenv("MCP_TRANSPORT", "stdio").lower()
+
+    if transport in {"http", "sse", "streamable-http"}:
+        # HTTP transport pro Smithery/Docker deployment
+        host = os.getenv("MCP_HOST", "0.0.0.0")
+        port = int(os.getenv("MCP_PORT", "8000"))
+
+        logger.info(f"Starting SÚKL MCP Server on {transport}://{host}:{port}")
+        mcp.run(transport=transport, host=host, port=port)
+    else:
+        # STDIO transport pro FastMCP Cloud a lokální použití
+        logger.info("Starting SÚKL MCP Server on stdio")
+        mcp.run()  # Výchozí stdio transport
 
 
 if __name__ == "__main__":

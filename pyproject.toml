@@ -77,7 +77,7 @@ Repository = "https://github.com/your-org/fastmcp-boilerplate"
 Changelog = "https://github.com/your-org/fastmcp-boilerplate/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/sukl_mcp"]
+packages = [{include = "sukl_mcp", from = "src"}]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
