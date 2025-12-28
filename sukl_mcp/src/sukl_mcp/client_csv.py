@@ -190,7 +190,10 @@ class SUKLClient:
         if df is None:
             return None
 
-        result = df[df['KOD_SUKL'] == sukl_code]
+        # Převeď kód na string a odstraň nuly na začátku pro porovnání
+        sukl_code_normalized = str(int(sukl_code)) if sukl_code.isdigit() else sukl_code
+
+        result = df[df['KOD_SUKL'].astype(str) == sukl_code_normalized]
         if result.empty:
             return None
 
@@ -205,8 +208,44 @@ class SUKLClient:
         if df_composition is None:
             return []
 
-        results = df_composition[df_composition['KOD_SUKL'] == sukl_code]
+        # Normalizuj kód
+        sukl_code_normalized = str(int(sukl_code)) if sukl_code.isdigit() else sukl_code
+        results = df_composition[df_composition['KOD_SUKL'].astype(str) == sukl_code_normalized]
         return results.to_dict('records')
+
+    async def search_pharmacies(
+        self,
+        city: Optional[str] = None,
+        postal_code: Optional[str] = None,
+        has_24h: bool = False,
+        has_internet_sales: bool = False,
+        limit: int = 20,
+    ) -> list[dict]:
+        """Vyhledej lékárny podle kritérií."""
+        if not self._initialized:
+            await self.initialize()
+
+        # Pro teď vrátíme prázdný seznam, protože nemáme data o lékárnách v DLP
+        logger.warning("Vyhledávání lékáren není implementováno - DLP neobsahuje data o lékárnách")
+        return []
+
+    async def get_atc_groups(self, atc_prefix: Optional[str] = None) -> list[dict]:
+        """Získej ATC skupiny podle prefixu."""
+        if not self._initialized:
+            await self.initialize()
+
+        df = self._loader.get_table('dlp_atc')
+        if df is None:
+            return []
+
+        # Pokud je zadán prefix, filtruj podle něj
+        if atc_prefix:
+            results = df[df['ATC'].str.startswith(atc_prefix, na=False)]
+        else:
+            results = df
+
+        # Vrať max 100 výsledků
+        return results.head(100).to_dict('records')
 
     async def close(self) -> None:
         """Uzavři klienta."""

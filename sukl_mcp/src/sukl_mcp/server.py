@@ -159,32 +159,37 @@ async def get_medicine_details(sukl_code: str) -> MedicineDetail | None:
     if not data:
         return None
 
+    # Helper pro získání hodnoty z CSV dat (velká písmena)
+    def get_val(key_upper: str, default=None):
+        """Získej hodnotu, podporuje jak velká tak malá písmena."""
+        return data.get(key_upper, data.get(key_upper.lower(), default))
+
     return MedicineDetail(
         sukl_code=sukl_code,
-        name=data.get("nazev", ""),
-        supplement=data.get("doplnek"),
-        strength=data.get("sila"),
-        form=data.get("forma"),
-        route=data.get("cesta_podani"),
-        package_size=data.get("velikost_baleni"),
-        package_type=data.get("typ_obalu"),
-        registration_number=data.get("registracni_cislo"),
-        registration_status=data.get("stav_registrace"),
-        registration_holder=data.get("drzitel"),
-        atc_code=data.get("atc"),
-        atc_name=data.get("atc_nazev"),
-        dispensation_mode=data.get("vydej"),
-        is_available=data.get("dostupnost") == "ano",
-        is_marketed=data.get("uvadeni_na_trh") == "ano",
-        has_reimbursement=data.get("uhrada") == "ano",
-        max_price=float(data["max_cena"]) if data.get("max_cena") else None,
-        reimbursement_amount=float(data["uhrada_castka"]) if data.get("uhrada_castka") else None,
-        patient_copay=float(data["doplatek"]) if data.get("doplatek") else None,
-        pil_available=data.get("pil") == "ano",
-        spc_available=data.get("spc") == "ano",
-        is_narcotic=data.get("omamna_latka") == "ano",
-        is_psychotropic=data.get("psychotropni") == "ano",
-        is_doping=data.get("doping") == "ano",
+        name=get_val("NAZEV", ""),
+        supplement=get_val("DOPLNEK"),
+        strength=get_val("SILA"),
+        form=get_val("FORMA"),
+        route=get_val("CESTA"),
+        package_size=get_val("BALENI"),
+        package_type=get_val("OBAL"),
+        registration_number=get_val("RC"),
+        registration_status=get_val("REG"),
+        registration_holder=get_val("DRZ"),
+        atc_code=get_val("ATC_WHO"),
+        atc_name=None,  # Není v základních datech
+        dispensation_mode=get_val("VYDEJ"),
+        is_available=get_val("DODAVKY") != "0",
+        is_marketed=True,  # Pokud je v databázi, je registrován
+        has_reimbursement=False,  # TODO: získat z separátní tabulky úhrad
+        max_price=None,  # TODO: získat z tabulky cen
+        reimbursement_amount=None,
+        patient_copay=None,
+        pil_available=False,  # TODO: zkontrolovat v nazvydokumentu
+        spc_available=False,
+        is_narcotic=get_val("ZAV") is not None and str(get_val("ZAV")) != "nan",
+        is_psychotropic=False,
+        is_doping=get_val("DOPING") is not None and str(get_val("DOPING")) != "nan",
         last_updated=datetime.now(),
     )
 
@@ -214,7 +219,7 @@ async def get_pil_content(sukl_code: str) -> PILContent | None:
 
     return PILContent(
         sukl_code=sukl_code,
-        medicine_name=detail.get("nazev", ""),
+        medicine_name=detail.get("NAZEV", detail.get("nazev", "")),
         document_url=f"https://prehledy.sukl.cz/pil/{sukl_code}.pdf",
         language="cs",
         full_text="Pro kompletní text příbalového letáku navštivte odkaz v document_url. "
@@ -240,15 +245,16 @@ async def check_availability(sukl_code: str) -> AvailabilityInfo | None:
     if not detail:
         return None
 
-    is_available = detail.get("dostupnost") == "ano"
-    is_marketed = detail.get("uvadeni_na_trh") == "ano"
+    # Dostupnost podle sloupce DODAVKY (0 = nedostupný)
+    is_available = detail.get("DODAVKY") != "0"
+    is_marketed = True  # Pokud je v databázi, je registrován
 
     return AvailabilityInfo(
         sukl_code=sukl_code,
-        medicine_name=detail.get("nazev", ""),
+        medicine_name=detail.get("NAZEV", ""),
         is_available=is_available,
         is_marketed=is_marketed,
-        unavailability_reason=detail.get("duvod_nedostupnosti") if not is_available else None,
+        unavailability_reason="Přípravek není aktuálně dodáván" if not is_available else None,
         alternatives_available=False,
         checked_at=datetime.now(),
     )
