@@ -49,8 +49,16 @@ Thumbs.db
 .gitignore
 
 # Documentation
-*.md
+# Exclude all .md files EXCEPT README.md (required by pyproject.toml)
+DEPLOYMENT.md
+SMITHERY_DEPLOYMENT.md
+DEPLOYMENT_CHECKLIST.md
+FASTMCP_CLOUD_FIX.md
+CONTRIBUTING.md
+CHANGELOG.md
 docs/
+
+# IMPORTANT: README.md is NOT excluded - it's required for pip install!
 
 # CI/CD
 .github/
