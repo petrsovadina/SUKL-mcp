@@ -78,31 +78,45 @@ async def search_medicine(
     only_available: bool = False,
     only_reimbursed: bool = False,
     limit: int = 20,
+    use_fuzzy: bool = True,
 ) -> SearchResponse:
     """
-    Vyhledá léčivé přípravky v databázi SÚKL.
+    Vyhledá léčivé přípravky v databázi SÚKL s multi-level search pipeline.
 
-    Vyhledává podle názvu přípravku, účinné látky nebo ATC kódu.
+    Vyhledává podle názvu přípravku, účinné látky nebo ATC kódu s fuzzy matchingem.
+
+    Multi-level pipeline:
+    1. Vyhledávání v účinné látce (dlp_slozeni)
+    2. Exact match v názvu
+    3. Substring match v názvu
+    4. Fuzzy fallback (rapidfuzz, threshold 80)
 
     Args:
         query: Hledaný text - název léčiva, účinná látka nebo ATC kód
         only_available: Pouze dostupné přípravky na trhu
         only_reimbursed: Pouze přípravky hrazené pojišťovnou
         limit: Maximální počet výsledků (1-100)
+        use_fuzzy: Použít fuzzy matching (default: True)
 
     Returns:
-        SearchResponse s výsledky vyhledávání
+        SearchResponse s výsledky vyhledávání včetně match metadat
 
     Examples:
         - search_medicine("ibuprofen")
         - search_medicine("N02", only_available=True)
         - search_medicine("Paralen", only_reimbursed=True)
+        - search_medicine("ibuprofn", use_fuzzy=True)  # Oprava překlepu
     """
     client = await get_sukl_client()
     start_time = datetime.now()
 
-    raw_results = await client.search_medicines(
-        query=query, limit=limit, only_available=only_available, only_reimbursed=only_reimbursed
+    # Získej výsledky s match metadaty (tuple: results, match_type)
+    raw_results, match_type = await client.search_medicines(
+        query=query,
+        limit=limit,
+        only_available=only_available,
+        only_reimbursed=only_reimbursed,
+        use_fuzzy=use_fuzzy,
     )
 
     # Transformace na Pydantic modely
@@ -123,7 +137,13 @@ async def search_medicine(
                     is_available=(
                         item.get("dostupnost") == "ano" if item.get("dostupnost") else None
                     ),
-                    has_reimbursement=item.get("uhrada") == "ano" if item.get("uhrada") else None,
+                    # Cenové údaje (EPIC 3: Price & Reimbursement)
+                    has_reimbursement=item.get("has_reimbursement"),
+                    max_price=item.get("max_price"),
+                    patient_copay=item.get("patient_copay"),
+                    # Match metadata (EPIC 2: Smart Search)
+                    match_score=item.get("match_score"),
+                    match_type=item.get("match_type"),
                 )
             )
         except Exception as e:
@@ -132,7 +152,11 @@ async def search_medicine(
     elapsed = (datetime.now() - start_time).total_seconds() * 1000
 
     return SearchResponse(
-        query=query, total_results=len(results), results=results, search_time_ms=elapsed
+        query=query,
+        total_results=len(results),
+        results=results,
+        search_time_ms=elapsed,
+        match_type=match_type,
     )
 
 
@@ -163,8 +187,11 @@ async def get_medicine_details(sukl_code: str) -> MedicineDetail | None:
 
     # Helper pro získání hodnoty z CSV dat (velká písmena)
     def get_val(key_upper: str, default=None):
-        """Získej hodnotu, podporuje jak velká tak malá písmena."""
+        """Získej hodnotu, podporuje jak velká tal malá písmena."""
         return data.get(key_upper, data.get(key_upper.lower(), default))
+
+    # Získej cenové údaje z dlp_cau (EPIC 3)
+    price_info = await client.get_price_info(sukl_code)
 
     return MedicineDetail(
         sukl_code=sukl_code,
@@ -183,10 +210,11 @@ async def get_medicine_details(sukl_code: str) -> MedicineDetail | None:
         dispensation_mode=get_val("VYDEJ"),
         is_available=get_val("DODAVKY") != "0",
         is_marketed=True,  # Pokud je v databázi, je registrován
-        has_reimbursement=False,  # TODO: získat z separátní tabulky úhrad
-        max_price=None,  # TODO: získat z tabulky cen
-        reimbursement_amount=None,
-        patient_copay=None,
+        # Cenové údaje z dlp_cau (EPIC 3)
+        has_reimbursement=price_info.get("is_reimbursed", False) if price_info else False,
+        max_price=price_info.get("max_price") if price_info else None,
+        reimbursement_amount=price_info.get("reimbursement_amount") if price_info else None,
+        patient_copay=price_info.get("patient_copay") if price_info else None,
         pil_available=False,  # TODO: zkontrolovat v nazvydokumentu
         spc_available=False,
         is_narcotic=get_val("ZAV") is not None and str(get_val("ZAV")) != "nan",
@@ -347,38 +375,62 @@ async def get_reimbursement(sukl_code: str) -> ReimbursementInfo | None:
     """
     Získá informace o úhradě léčivého přípravku zdravotní pojišťovnou.
 
+    Vrací maximální cenu, výši úhrady pojišťovny a doplatek pacienta
+    podle aktuálních cenových předpisů SÚKL (dlp_cau.csv).
+
     POZNÁMKA: Skutečný doplatek se může lišit podle konkrétní pojišťovny
     a bonusových programů lékáren.
 
     Args:
-        sukl_code: SÚKL kód přípravku
+        sukl_code: SÚKL kód přípravku (7 číslic, např. "0012345")
 
     Returns:
-        ReimbursementInfo s informacemi o úhradě
+        ReimbursementInfo s cenovými a úhradovými informacemi nebo None
+
+    Examples:
+        - get_reimbursement("0012345")
     """
     client = await get_sukl_client()
     sukl_code = sukl_code.strip().zfill(7)
 
+    # Získej základní informace o léčivu
     detail = await client.get_medicine_detail(sukl_code)
     if not detail:
         return None
 
-    # Pro teď vrátíme základní informace, úhrady jsou v separátních CSV souborech
-    is_reimbursed = False  # TODO: získat z dlp_cau_scau.csv
+    # Získej cenové a úhradové informace z dlp_cau
+    price_info = await client.get_price_info(sukl_code)
 
-    return ReimbursementInfo(
-        sukl_code=sukl_code,
-        medicine_name=detail.get("NAZEV", ""),
-        is_reimbursed=is_reimbursed,
-        reimbursement_group=None,  # TODO: z CAU tabulky
-        max_producer_price=None,
-        max_retail_price=None,
-        reimbursement_amount=None,
-        patient_copay=None,
-        has_indication_limit=False,
-        indication_limit_text=None,
-        specialist_only=False,
-    )
+    # Sestavení response
+    if price_info:
+        return ReimbursementInfo(
+            sukl_code=sukl_code,
+            medicine_name=detail.get("NAZEV", ""),
+            is_reimbursed=price_info.get("is_reimbursed", False),
+            reimbursement_group=price_info.get("indication_group"),
+            max_producer_price=price_info.get("max_price"),
+            max_retail_price=price_info.get("max_price"),  # Stejná hodnota jako max_producer_price
+            reimbursement_amount=price_info.get("reimbursement_amount"),
+            patient_copay=price_info.get("patient_copay"),
+            has_indication_limit=bool(price_info.get("indication_group")),
+            indication_limit_text=price_info.get("indication_group"),
+            specialist_only=False,  # TODO: Pokud bude v CSV
+        )
+    else:
+        # Fallback pokud nejsou cenová data
+        return ReimbursementInfo(
+            sukl_code=sukl_code,
+            medicine_name=detail.get("NAZEV", ""),
+            is_reimbursed=False,
+            reimbursement_group=None,
+            max_producer_price=None,
+            max_retail_price=None,
+            reimbursement_amount=None,
+            patient_copay=None,
+            has_indication_limit=False,
+            indication_limit_text=None,
+            specialist_only=False,
+        )
 
 
 @mcp.tool

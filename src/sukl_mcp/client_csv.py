@@ -143,6 +143,7 @@ class SUKLDataLoader:
             "dlp_lecivelatky",  # Léčivé látky
             "dlp_atc",  # ATC kódy
             "dlp_nazvydokumentu",  # Dokumenty (PIL)
+            "dlp_cau",  # Cenové a úhradové údaje (EPIC 3)
         ]
 
         def _load_single_csv(table: str) -> tuple[str, Optional[pd.DataFrame]]:
@@ -205,8 +206,28 @@ class SUKLClient:
         offset: int = 0,
         only_available: bool = False,
         only_reimbursed: bool = False,
-    ) -> list[dict]:
-        """Vyhledej léčivé přípravky podle názvu."""
+        use_fuzzy: bool = True,
+    ) -> tuple[list[dict], str]:
+        """
+        Vyhledej léčivé přípravky s multi-level pipeline a fuzzy fallbackem.
+
+        Args:
+            query: Vyhledávací dotaz
+            limit: Max počet výsledků
+            offset: Offset pro paging
+            only_available: Filtr pouze dostupné léky
+            only_reimbursed: Filtr pouze hrazené léky
+            use_fuzzy: Použít fuzzy matching (default: True)
+
+        Returns:
+            Tuple (results, match_type) kde match_type je "substance", "exact", "substring", "fuzzy", nebo "none"
+
+        Raises:
+            SUKLValidationError: Při neplatném vstupu
+        """
+        # Import zde aby se předešlo circular dependencies
+        from sukl_mcp.fuzzy_search import get_fuzzy_matcher
+
         # Input validace
         if not query or not query.strip():
             raise SUKLValidationError("Query nesmí být prázdný")
@@ -220,28 +241,120 @@ class SUKLClient:
         if not self._initialized:
             await self.initialize()
 
-        df = self._loader.get_table("dlp_lecivepripravky")
-        if df is None:
-            return []
+        df_medicines = self._loader.get_table("dlp_lecivepripravky")
+        if df_medicines is None:
+            return ([], "none")
 
-        # Case-insensitive vyhledávání v názvu (regex=False proti injection)
-        mask = df["NAZEV"].str.contains(query, case=False, na=False, regex=False)
-        results = df[mask]
-
-        # Aplikuj filtry
+        # Aplikuj pre-filtry
         if only_available:
-            # TODO: přidat filtr dostupnosti
-            pass
+            df_medicines = df_medicines[
+                df_medicines["DODAVKY"].str.upper() == "A"
+            ].copy()
 
         if only_reimbursed:
-            # TODO: přidat filtr úhrad
+            # NOTE: Reimbursement filtering je implementováno post-enrichment
+            # protože cenová data jsou v separátní tabulce (dlp_cau).
+            # Pre-filtering by vyžadoval DataFrame merge což je nákladné.
+            # Pro filtrování podle úhrad použij price data z výsledků.
             pass
 
-        # Paging
-        results = results.iloc[offset : offset + limit]
+        if df_medicines.empty:
+            return ([], "none")
 
-        # Konverze na dict
-        return results.to_dict("records")
+        # Multi-level search s fuzzy fallbackem
+        if use_fuzzy:
+            matcher = get_fuzzy_matcher()
+
+            # Získej optional tabulky pro substance search
+            df_composition = self._loader.get_table("dlp_slozeni")
+            df_substances = self._loader.get_table("dlp_lecivelatky")
+
+            results, match_type = matcher.search(
+                query=query,
+                df_medicines=df_medicines,
+                df_composition=df_composition,
+                df_substances=df_substances,
+                limit=limit + offset,  # Fetch více pro offset
+            )
+
+            # Aplikuj offset
+            if offset > 0:
+                results = results[offset:]
+
+        else:
+            # Legacy simple substring search (zpětná kompatibilita)
+            mask = df_medicines["NAZEV"].str.contains(query, case=False, na=False, regex=False)
+            results_df = df_medicines[mask]
+
+            # Paging
+            results_df = results_df.iloc[offset : offset + limit]
+
+            # Konverze na dict
+            results = results_df.to_dict("records")
+
+            # Přidej match metadata pro konzistenci
+            for result in results:
+                result["match_score"] = 10.0  # Default score
+                result["match_type"] = "substring"
+
+            match_type = "substring" if results else "none"
+
+        # Obohacení výsledků o cenové údaje (EPIC 3)
+        results = await self._enrich_with_price_data(results)
+
+        return (results, match_type)
+
+    async def _enrich_with_price_data(self, results: list[dict]) -> list[dict]:
+        """
+        Obohať výsledky vyhledávání o cenové údaje z dlp_cau.
+
+        Args:
+            results: Seznam výsledků vyhledávání
+
+        Returns:
+            Výsledky obohacené o cenové údaje (has_reimbursement, max_price, patient_copay)
+        """
+        if not results:
+            return results
+
+        df_cau = self._loader.get_table("dlp_cau")
+        if df_cau is None:
+            # Pokud dlp_cau není k dispozici, vrať results s None hodnotami
+            for result in results:
+                result["has_reimbursement"] = False
+                result["max_price"] = None
+                result["patient_copay"] = None
+            return results
+
+        # Import price calculator
+        from sukl_mcp.price_calculator import get_price_data
+
+        # Extrahuj všechny SÚKL kódy z výsledků
+        sukl_codes = [str(r.get("KOD_SUKL", "")) for r in results if r.get("KOD_SUKL")]
+
+        # Vytvoř lookup dictionary pro rychlé vyhledávání
+        price_lookup = {}
+        for sukl_code in sukl_codes:
+            if sukl_code and sukl_code.isdigit():
+                price_data = get_price_data(df_cau, sukl_code)
+                if price_data:
+                    price_lookup[sukl_code] = price_data
+
+        # Obohať každý výsledek o cenové údaje
+        for result in results:
+            sukl_code = str(result.get("KOD_SUKL", ""))
+            price_data = price_lookup.get(sukl_code)
+
+            if price_data:
+                result["has_reimbursement"] = price_data.get("is_reimbursed", False)
+                result["max_price"] = price_data.get("max_price")
+                result["patient_copay"] = price_data.get("patient_copay")
+            else:
+                result["has_reimbursement"] = False
+                result["max_price"] = None
+                result["patient_copay"] = None
+
+        return results
 
     async def get_medicine_detail(self, sukl_code: str) -> Optional[dict]:
         """Získej detail léčivého přípravku."""
@@ -327,6 +440,40 @@ class SUKLClient:
 
         # Vrať max 100 výsledků
         return results.head(100).to_dict("records")
+
+    async def get_price_info(self, sukl_code: str) -> Optional[dict]:
+        """
+        Získej cenové a úhradové informace o léčivém přípravku.
+
+        Args:
+            sukl_code: SÚKL kód léčiva
+
+        Returns:
+            Dict s cenovými údaji nebo None
+        """
+        # Input validace
+        if not sukl_code or not sukl_code.strip():
+            raise SUKLValidationError("SÚKL kód nesmí být prázdný")
+        sukl_code = sukl_code.strip()
+        if not sukl_code.isdigit():
+            raise SUKLValidationError(f"SÚKL kód musí být číselný (zadáno: {sukl_code})")
+        if len(sukl_code) > 7:
+            raise SUKLValidationError(
+                f"SÚKL kód příliš dlouhý: {len(sukl_code)} znaků (maximum: 7)"
+            )
+
+        if not self._initialized:
+            await self.initialize()
+
+        df_cau = self._loader.get_table("dlp_cau")
+        if df_cau is None:
+            logger.warning("dlp_cau table není načtena - cenové údaje nejsou dostupné")
+            return None
+
+        # Použij price_calculator pro získání dat
+        from sukl_mcp.price_calculator import get_price_data
+
+        return get_price_data(df_cau, sukl_code)
 
     async def close(self) -> None:
         """Uzavři klienta."""

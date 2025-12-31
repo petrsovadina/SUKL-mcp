@@ -47,7 +47,15 @@ class MedicineSearchResult(BaseModel):
     registration_status: Optional[str] = Field(None, description="Stav registrace")
     dispensation_mode: Optional[str] = Field(None, description="Režim výdeje")
     is_available: Optional[bool] = Field(None, description="Dostupnost na trhu")
+
+    # Cenové údaje (EPIC 3: Price & Reimbursement)
     has_reimbursement: Optional[bool] = Field(None, description="Má úhradu")
+    max_price: Optional[float] = Field(None, description="Maximální cena")
+    patient_copay: Optional[float] = Field(None, description="Doplatek pacienta")
+
+    # Match metadata (EPIC 2: Smart Search)
+    match_score: Optional[float] = Field(None, description="Relevance skóre (0-100)")
+    match_type: Optional[str] = Field(None, description="Typ matchování: substance/exact/substring/fuzzy")
 
 
 class MedicineDetail(BaseModel):
@@ -183,3 +191,4 @@ class SearchResponse(BaseModel):
     total_results: int
     results: list[MedicineSearchResult]
     search_time_ms: Optional[float] = None
+    match_type: Optional[str] = Field(None, description="Typ matchování: substance/exact/substring/fuzzy/none")
