@@ -12,6 +12,8 @@ from fastmcp import FastMCP
 
 # Absolutní importy pro FastMCP Cloud compatibility
 from sukl_mcp.client_csv import close_sukl_client, get_sukl_client
+from sukl_mcp.document_parser import close_document_parser, get_document_parser
+from sukl_mcp.exceptions import SUKLDocumentError, SUKLParseError
 from sukl_mcp.models import (
     AvailabilityInfo,
     MedicineDetail,
@@ -42,6 +44,7 @@ async def server_lifespan(server):
 
     logger.info("Shutting down SÚKL MCP Server...")
     await close_sukl_client()
+    close_document_parser()
 
 
 # === FastMCP instance ===
@@ -199,16 +202,21 @@ async def get_pil_content(sukl_code: str) -> PILContent | None:
     Získá obsah příbalového letáku (PIL) pro pacienty.
 
     Příbalový leták obsahuje informace o použití, dávkování a nežádoucích účincích.
+    Dokument je automaticky stažen a parsován z PDF/DOCX formátu.
 
     DŮLEŽITÉ: Tato informace je pouze informativní. Vždy se řiďte pokyny lékaře.
 
     Args:
-        sukl_code: SÚKL kód přípravku
+        sukl_code: SÚKL kód přípravku (např. "0254045")
 
     Returns:
-        PILContent s obsahem letáku nebo None
+        PILContent s obsahem letáku nebo None pokud dokument není dostupný
+
+    Examples:
+        - get_pil_content("0254045")
     """
     client = await get_sukl_client()
+    parser = get_document_parser()
     sukl_code = sukl_code.strip().zfill(7)
 
     # Získej detail pro název
@@ -216,14 +224,89 @@ async def get_pil_content(sukl_code: str) -> PILContent | None:
     if not detail:
         return None
 
-    return PILContent(
-        sukl_code=sukl_code,
-        medicine_name=detail.get("NAZEV", detail.get("nazev", "")),
-        document_url=f"https://prehledy.sukl.cz/pil/{sukl_code}.pdf",
-        language="cs",
-        full_text="Pro kompletní text příbalového letáku navštivte odkaz v document_url. "
-        "Příbalový leták je dostupný ve formátu PDF na stránkách SÚKL.",
-    )
+    medicine_name = detail.get("NAZEV", detail.get("nazev", ""))
+
+    # Parsuj dokument
+    try:
+        doc_data = await parser.get_document_content(sukl_code=sukl_code, doc_type="pil")
+
+        return PILContent(
+            sukl_code=sukl_code,
+            medicine_name=medicine_name,
+            document_url=doc_data["url"],
+            language="cs",
+            full_text=doc_data["content"],
+            document_format=doc_data["format"],
+        )
+
+    except (SUKLDocumentError, SUKLParseError) as e:
+        logger.warning(f"Chyba při získávání PIL pro {sukl_code}: {e}")
+        # Fallback: vrátit pouze URL
+        return PILContent(
+            sukl_code=sukl_code,
+            medicine_name=medicine_name,
+            document_url=f"https://prehledy.sukl.cz/pil/{sukl_code}.pdf",
+            language="cs",
+            full_text=f"Dokument není dostupný k automatickému parsování. "
+            f"Pro zobrazení navštivte: https://prehledy.sukl.cz/pil/{sukl_code}.pdf",
+            document_format=None,
+        )
+
+
+@mcp.tool
+async def get_spc_content(sukl_code: str) -> PILContent | None:
+    """
+    Získá obsah Souhrnu údajů o přípravku (SPC) pro odborníky.
+
+    SPC obsahuje detailní farmakologické informace, indikace, kontraindikace,
+    interakce a další odborné údaje pro zdravotnické pracovníky.
+
+    Args:
+        sukl_code: SÚKL kód přípravku (např. "0254045")
+
+    Returns:
+        PILContent s obsahem SPC nebo None pokud dokument není dostupný
+
+    Examples:
+        - get_spc_content("0254045")
+    """
+    client = await get_sukl_client()
+    parser = get_document_parser()
+    sukl_code = sukl_code.strip().zfill(7)
+
+    # Získej detail pro název
+    detail = await client.get_medicine_detail(sukl_code)
+    if not detail:
+        return None
+
+    medicine_name = detail.get("NAZEV", detail.get("nazev", ""))
+
+    # Parsuj dokument
+    try:
+        doc_data = await parser.get_document_content(sukl_code=sukl_code, doc_type="spc")
+
+        return PILContent(
+            sukl_code=sukl_code,
+            medicine_name=medicine_name,
+            document_url=doc_data["url"],
+            language="cs",
+            full_text=doc_data["content"],
+            document_format=doc_data["format"],
+        )
+
+    except (SUKLDocumentError, SUKLParseError) as e:
+        logger.warning(f"Chyba při získávání SPC pro {sukl_code}: {e}")
+        # Fallback: vrátit pouze URL
+        return PILContent(
+            sukl_code=sukl_code,
+            medicine_name=medicine_name,
+            document_url=f"https://prehledy.sukl.cz/spc/{sukl_code}.pdf",
+            language="cs",
+            full_text=f"Dokument není dostupný k automatickému parsování. "
+            f"Pro zobrazení navštivte: https://prehledy.sukl.cz/spc/{sukl_code}.pdf",
+            document_format=None,
+        )
+
 
 
 @mcp.tool

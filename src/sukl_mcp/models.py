@@ -98,13 +98,14 @@ class MedicineDetail(BaseModel):
 
 
 class PILContent(BaseModel):
-    """Obsah příbalového letáku (PIL)."""
+    """Obsah příbalového letáku (PIL) nebo SPC."""
 
     sukl_code: str
     medicine_name: str
-    document_url: Optional[str] = Field(None, description="URL PDF dokumentu")
+    document_url: Optional[str] = Field(None, description="URL dokumentu")
     language: str = Field("cs", description="Jazyk dokumentu")
-    full_text: Optional[str] = None
+    full_text: Optional[str] = Field(None, description="Extrahovaný text dokumentu")
+    document_format: Optional[str] = Field(None, description="Formát dokumentu (pdf, docx)")
 
 
 class AvailabilityInfo(BaseModel):
