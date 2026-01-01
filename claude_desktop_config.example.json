@@ -10,7 +10,7 @@
     },
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/YOURUSER/Desktop"],
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/YOURUSER/Desktop/Projects/specific-project"],
       "env": {}
     },
     "brave-search": {
