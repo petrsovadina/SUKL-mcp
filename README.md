@@ -49,8 +49,8 @@ SÚKL MCP Server je implementace [Model Context Protocol](https://modelcontextpr
 
 ```bash
 # 1. Klonovat repozitář
-git clone https://github.com/your-org/fastmcp-boilerplate.git
-cd fastmcp-boilerplate
+git clone https://github.com/your-org/SUKL-mcp.git
+cd SUKL-mcp
 
 # 2. Vytvořit virtuální prostředí
 python3 -m venv venv
@@ -82,7 +82,7 @@ Přidej do `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "command": "python",
       "args": ["-m", "sukl_mcp"],
       "env": {
-        "PYTHONPATH": "/cesta/k/fastmcp-boilerplate/src"
+        "PYTHONPATH": "/cesta/k/SUKL-mcp/src"
       }
     }
   }
@@ -90,6 +90,8 @@ Přidej do `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```
 
 Restart Claude Desktop a server bude k dispozici.
+
+**Chceš používat více MCP serverů současně?** Podívej se na [Multi-Server Setup Guide](docs/multi-server-setup.md) pro konfiguraci SÚKL serveru s dalšími službami (filesystem, GitHub, web search, atd.).
 
 ---
 
@@ -307,7 +309,7 @@ make dev          # Format + test + lint (kompletní workflow)
 ### Struktura projektu
 
 ```
-fastmcp-boilerplate/
+SUKL-mcp/
 ├── src/sukl_mcp/
 │   ├── server.py          # FastMCP server + MCP tools
 │   ├── client_csv.py      # Data loader + query engine
@@ -477,7 +479,7 @@ Data poskytnutá SÚKL pod podmínkami Open Data: https://opendata.sukl.cz/?q=po
 - **FastMCP Framework**: https://gofastmcp.com
 - **SÚKL Open Data**: https://opendata.sukl.cz
 - **Model Context Protocol**: https://modelcontextprotocol.io
-- **Issues & Support**: https://github.com/your-org/fastmcp-boilerplate/issues
+- **Issues & Support**: https://github.com/your-org/SUKL-mcp/issues
 
 ---
 
