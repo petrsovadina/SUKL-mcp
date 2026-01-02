@@ -5,9 +5,10 @@ Poskytuje AI agentům přístup k české databázi léčivých přípravků.
 """
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import AsyncGenerator, Literal
+from typing import Literal
 
 from fastmcp import FastMCP
 
@@ -19,8 +20,8 @@ from sukl_mcp.models import (
     AvailabilityInfo,
     MedicineDetail,
     MedicineSearchResult,
-    PILContent,
     PharmacyInfo,
+    PILContent,
     ReimbursementInfo,
     SearchResponse,
 )
@@ -38,11 +39,11 @@ async def server_lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
     """Inicializace a cleanup serveru."""
     logger.info("Starting SÚKL MCP Server...")
     client = await get_sukl_client()
-    
+
     # Explicitní inicializace při startu (Cold Start fix)
     # Stáhne a načte data do paměti, aby první request nebyl pomalý
     await client.initialize()
-    
+
     health = await client.health_check()
     logger.info(f"Health check: {health}")
 

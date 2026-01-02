@@ -43,6 +43,9 @@ print_skip() {
 # Change to script directory
 cd "$(dirname "$0")"
 
+# Add src to PYTHONPATH to ensure imports work even if editable install has issues
+export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+
 print_header "SÚKL MCP Server v3.1.0 - Deployment Validation"
 
 # 1. Version consistency

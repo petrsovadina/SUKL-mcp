@@ -23,7 +23,6 @@ from sukl_mcp.fuzzy_search import (
     get_fuzzy_matcher,
 )
 
-
 # === Test Data Fixtures ===
 
 

@@ -7,8 +7,7 @@ Podporuje stahování a parsing PDF a DOCX souborů s async cachingem.
 import asyncio
 import logging
 from io import BytesIO
-from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import docx
 import httpx
@@ -101,7 +100,7 @@ class DocumentDownloader:
                     format_type = "docx"
                 else:
                     raise SUKLDocumentError(
-                        f"Nepodporovaný formát dokumentu (neznámá URL extension)"
+                        "Nepodporovaný formát dokumentu (neznámá URL extension)"
                     )
 
                 logger.info(f"Dokument stažen: {len(content)} B, formát: {format_type}")
@@ -247,9 +246,9 @@ class DocumentParser:
 
     def __init__(
         self,
-        downloader: Optional[DocumentDownloader] = None,
-        pdf_parser: Optional[PDFParser] = None,
-        docx_parser: Optional[DOCXParser] = None,
+        downloader: DocumentDownloader | None = None,
+        pdf_parser: PDFParser | None = None,
+        docx_parser: DOCXParser | None = None,
     ):
         self.downloader = downloader or DocumentDownloader()
         self.pdf_parser = pdf_parser or PDFParser()
@@ -342,7 +341,7 @@ class DocumentParser:
 
 # === Singleton instance ===
 
-_parser: Optional[DocumentParser] = None
+_parser: DocumentParser | None = None
 
 
 def get_document_parser() -> DocumentParser:
