@@ -343,7 +343,6 @@ async def get_spc_content(sukl_code: str) -> PILContent | None:
         )
 
 
-
 @mcp.tool
 async def check_availability(
     sukl_code: str,
