@@ -375,7 +375,10 @@ Get the Summary of Product Characteristics (SPC) for healthcare professionals.
 #### Signature
 
 ```python
-async def get_spc_content(sukl_code: str) -> PILContent | None
+async def get_spc_content(
+    sukl_code: str,
+    ctx: Context | None = None,
+) -> PILContent | None
 ```
 
 #### Parameters
