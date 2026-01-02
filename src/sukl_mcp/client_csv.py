@@ -11,7 +11,7 @@ import re
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pandas as pd
@@ -68,7 +68,7 @@ class SUKLConfig(BaseModel):
 class SUKLDataLoader:
     """Loader pro SÚKL CSV data."""
 
-    def __init__(self, config: Optional[SUKLConfig] = None):
+    def __init__(self, config: SUKLConfig | None = None):
         self.config = config or SUKLConfig()
         self._data: dict[str, pd.DataFrame] = {}
         self._loaded = False
@@ -118,7 +118,7 @@ class SUKLDataLoader:
         """Rozbal ZIP soubor (async přes executor + ZIP bomb protection)."""
         logger.info(f"Rozbaluji {zip_path}...")
 
-        def _sync_extract():
+        def _sync_extract() -> None:
             """Synchronní extrakce s bezpečnostní kontrolou."""
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 # ZIP bomb protection - kontrola celkové velikosti
@@ -152,7 +152,7 @@ class SUKLDataLoader:
             "dlp_cau",  # Cenové a úhradové údaje (EPIC 3)
         ]
 
-        def _load_single_csv(table: str) -> tuple[str, Optional[pd.DataFrame]]:
+        def _load_single_csv(table: str) -> tuple[str, pd.DataFrame | None]:
             """Načti jeden CSV soubor (synchronní funkce pro executor)."""
             csv_path = self.config.data_dir / f"{table}.csv"
             if not csv_path.exists():
@@ -181,7 +181,7 @@ class SUKLDataLoader:
             else:
                 logger.warning(f"  ✗ {table}: soubor nenalezen")
 
-    def get_table(self, name: str) -> Optional[pd.DataFrame]:
+    def get_table(self, name: str) -> pd.DataFrame | None:
         """Získej DataFrame tabulky."""
         return self._data.get(name)
 
@@ -189,7 +189,7 @@ class SUKLDataLoader:
 class SUKLClient:
     """Async klient pro SÚKL CSV data."""
 
-    def __init__(self, config: Optional[SUKLConfig] = None):
+    def __init__(self, config: SUKLConfig | None = None):
         self.config = config or SUKLConfig()
         self._loader = SUKLDataLoader(config)
         self._initialized = False
@@ -356,7 +356,7 @@ class SUKLClient:
         # Neznámé/neplatné hodnoty
         return AvailabilityStatus.UNKNOWN
 
-    def _parse_strength(self, strength_str: str) -> tuple[Optional[float], str]:
+    def _parse_strength(self, strength_str: str) -> tuple[float | None, str]:
         """
         Parsuj sílu přípravku na numerickou hodnotu a jednotku.
 
@@ -759,7 +759,7 @@ class SUKLClient:
 
         return results
 
-    async def get_medicine_detail(self, sukl_code: str) -> Optional[dict]:
+    async def get_medicine_detail(self, sukl_code: str) -> dict | None:
         """Získej detail léčivého přípravku."""
         # Input validace
         if not sukl_code or not sukl_code.strip():
@@ -804,8 +804,8 @@ class SUKLClient:
 
     async def search_pharmacies(
         self,
-        city: Optional[str] = None,
-        postal_code: Optional[str] = None,
+        city: str | None = None,
+        postal_code: str | None = None,
         has_24h: bool = False,
         has_internet_sales: bool = False,
         limit: int = 20,
@@ -818,7 +818,7 @@ class SUKLClient:
         logger.warning("Vyhledávání lékáren není implementováno - DLP neobsahuje data o lékárnách")
         return []
 
-    async def get_atc_groups(self, atc_prefix: Optional[str] = None) -> list[dict]:
+    async def get_atc_groups(self, atc_prefix: str | None = None) -> list[dict]:
         """Získej ATC skupiny podle prefixu."""
         # Input validace
         if atc_prefix:
@@ -844,7 +844,7 @@ class SUKLClient:
         # Vrať max 100 výsledků
         return results.head(100).to_dict("records")
 
-    async def get_price_info(self, sukl_code: str) -> Optional[dict]:
+    async def get_price_info(self, sukl_code: str) -> dict | None:
         """
         Získej cenové a úhradové informace o léčivém přípravku.
 
@@ -885,7 +885,7 @@ class SUKLClient:
 
 
 # Globální instance klienta s thread-safe inicializací
-_client: Optional[SUKLClient] = None
+_client: SUKLClient | None = None
 _client_lock: asyncio.Lock = asyncio.Lock()
 
 

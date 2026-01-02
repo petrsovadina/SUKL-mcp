@@ -7,7 +7,7 @@ s důrazem na security, error handling a async behavior.
 
 import asyncio
 from io import BytesIO
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 import docx
 import httpx
@@ -22,15 +22,14 @@ from sukl_mcp.document_parser import (
     MAX_FILE_SIZE,
     MAX_PDF_PAGES,
     PARSE_TIMEOUT,
-    DOCXParser,
     DocumentDownloader,
     DocumentParser,
+    DOCXParser,
     PDFParser,
     close_document_parser,
     get_document_parser,
 )
 from sukl_mcp.exceptions import SUKLDocumentError, SUKLParseError
-
 
 # === Fixtures ===
 
@@ -45,7 +44,7 @@ def sample_pdf_bytes():
     writer = PdfWriter()
 
     # Přidej 3 strany s textem
-    for page_num in range(3):
+    for _ in range(3):
         writer.add_blank_page(width=612, height=792)  # Letter size
         # Note: pypdf PdfWriter nepodporuje přidání textu bez složitého nastavení
         # Pro testování použijeme prázdné strany a mockujeme extract_text()
@@ -338,7 +337,6 @@ class TestDocumentDownloader:
     @pytest.mark.asyncio
     async def test_download_follow_redirects(self, httpx_mock):
         """Test že download následuje redirecty."""
-        original_url = "https://example.com/redirect"
         final_url = "https://example.com/final.pdf"
         content = b"final content"
 
@@ -396,7 +394,7 @@ class TestPDFParser:
         with patch.object(pypdf.PageObject, "extract_text") as mock_extract:
             mock_extract.return_value = "Page text"
 
-            text = parser.parse(large_pdf_bytes)
+            parser.parse(large_pdf_bytes)
 
             # Mělo by zparsovat pouze prvních 100 stran
             assert mock_extract.call_count <= 100
@@ -959,7 +957,7 @@ class TestSecurityFeatures:
         with patch.object(pypdf.PageObject, "extract_text") as mock_extract:
             mock_extract.return_value = "Page text"
 
-            result = await parser.get_document_content(sukl_code, doc_type)
+            await parser.get_document_content(sukl_code, doc_type)
 
             # Mělo by zparsovat pouze prvních 100 stran
             assert mock_extract.call_count <= MAX_PDF_PAGES

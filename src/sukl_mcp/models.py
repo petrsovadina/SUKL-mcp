@@ -4,9 +4,8 @@ Pydantic modely pro SÚKL MCP Server.
 Definuje datové struktury pro léčivé přípravky, lékárny, úhrady a dostupnost.
 """
 
-from datetime import date, datetime
+from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -47,23 +46,23 @@ class MedicineSearchResult(BaseModel):
 
     sukl_code: str = Field(..., description="Kód SÚKL (7 číslic)")
     name: str = Field(..., description="Název přípravku")
-    supplement: Optional[str] = Field(None, description="Doplněk názvu")
-    strength: Optional[str] = Field(None, description="Síla přípravku")
-    form: Optional[str] = Field(None, description="Léková forma")
-    package: Optional[str] = Field(None, description="Velikost balení")
-    atc_code: Optional[str] = Field(None, description="ATC kód")
-    registration_status: Optional[str] = Field(None, description="Stav registrace")
-    dispensation_mode: Optional[str] = Field(None, description="Režim výdeje")
-    is_available: Optional[bool] = Field(None, description="Dostupnost na trhu")
+    supplement: str | None = Field(None, description="Doplněk názvu")
+    strength: str | None = Field(None, description="Síla přípravku")
+    form: str | None = Field(None, description="Léková forma")
+    package: str | None = Field(None, description="Velikost balení")
+    atc_code: str | None = Field(None, description="ATC kód")
+    registration_status: str | None = Field(None, description="Stav registrace")
+    dispensation_mode: str | None = Field(None, description="Režim výdeje")
+    is_available: bool | None = Field(None, description="Dostupnost na trhu")
 
     # Cenové údaje (EPIC 3: Price & Reimbursement)
-    has_reimbursement: Optional[bool] = Field(None, description="Má úhradu")
-    max_price: Optional[float] = Field(None, description="Maximální cena")
-    patient_copay: Optional[float] = Field(None, description="Doplatek pacienta")
+    has_reimbursement: bool | None = Field(None, description="Má úhradu")
+    max_price: float | None = Field(None, description="Maximální cena")
+    patient_copay: float | None = Field(None, description="Doplatek pacienta")
 
     # Match metadata (EPIC 2: Smart Search)
-    match_score: Optional[float] = Field(None, description="Relevance skóre (0-100)")
-    match_type: Optional[str] = Field(None, description="Typ matchování: substance/exact/substring/fuzzy")
+    match_score: float | None = Field(None, description="Relevance skóre (0-100)")
+    match_type: str | None = Field(None, description="Typ matchování: substance/exact/substring/fuzzy")
 
 
 class MedicineDetail(BaseModel):
@@ -72,34 +71,34 @@ class MedicineDetail(BaseModel):
     # Základní identifikace
     sukl_code: str = Field(..., description="Kód SÚKL")
     name: str = Field(..., description="Název přípravku")
-    supplement: Optional[str] = Field(None, description="Doplněk názvu")
+    supplement: str | None = Field(None, description="Doplněk názvu")
 
     # Složení a forma
-    strength: Optional[str] = Field(None, description="Síla")
-    form: Optional[str] = Field(None, description="Léková forma")
-    route: Optional[str] = Field(None, description="Cesta podání")
-    package_size: Optional[str] = Field(None, description="Velikost balení")
-    package_type: Optional[str] = Field(None, description="Typ obalu")
+    strength: str | None = Field(None, description="Síla")
+    form: str | None = Field(None, description="Léková forma")
+    route: str | None = Field(None, description="Cesta podání")
+    package_size: str | None = Field(None, description="Velikost balení")
+    package_type: str | None = Field(None, description="Typ obalu")
 
     # Registrace
-    registration_number: Optional[str] = Field(None, description="Registrační číslo")
-    registration_status: Optional[str] = Field(None, description="Stav registrace")
-    registration_holder: Optional[str] = Field(None, description="Držitel rozhodnutí")
+    registration_number: str | None = Field(None, description="Registrační číslo")
+    registration_status: str | None = Field(None, description="Stav registrace")
+    registration_holder: str | None = Field(None, description="Držitel rozhodnutí")
 
     # Klasifikace
-    atc_code: Optional[str] = Field(None, description="ATC kód")
-    atc_name: Optional[str] = Field(None, description="Název ATC skupiny")
-    dispensation_mode: Optional[str] = Field(None, description="Režim výdeje")
+    atc_code: str | None = Field(None, description="ATC kód")
+    atc_name: str | None = Field(None, description="Název ATC skupiny")
+    dispensation_mode: str | None = Field(None, description="Režim výdeje")
 
     # Dostupnost
-    is_available: Optional[bool] = Field(None, description="Aktuálně dostupný")
-    is_marketed: Optional[bool] = Field(None, description="Uváděn na trh")
+    is_available: bool | None = Field(None, description="Aktuálně dostupný")
+    is_marketed: bool | None = Field(None, description="Uváděn na trh")
 
     # Úhrady
-    has_reimbursement: Optional[bool] = Field(None, description="Hrazen pojišťovnou")
-    max_price: Optional[float] = Field(None, description="Maximální cena")
-    reimbursement_amount: Optional[float] = Field(None, description="Výše úhrady")
-    patient_copay: Optional[float] = Field(None, description="Doplatek pacienta")
+    has_reimbursement: bool | None = Field(None, description="Hrazen pojišťovnou")
+    max_price: float | None = Field(None, description="Maximální cena")
+    reimbursement_amount: float | None = Field(None, description="Výše úhrady")
+    patient_copay: float | None = Field(None, description="Doplatek pacienta")
 
     # Dokumenty
     pil_available: bool = Field(False, description="Příbalový leták dostupný")
@@ -110,7 +109,7 @@ class MedicineDetail(BaseModel):
     is_psychotropic: bool = Field(False, description="Psychotropní látka")
     is_doping: bool = Field(False, description="Doping")
 
-    last_updated: Optional[datetime] = Field(None, description="Poslední aktualizace")
+    last_updated: datetime | None = Field(None, description="Poslední aktualizace")
 
 
 class PILContent(BaseModel):
@@ -118,10 +117,10 @@ class PILContent(BaseModel):
 
     sukl_code: str
     medicine_name: str
-    document_url: Optional[str] = Field(None, description="URL dokumentu")
+    document_url: str | None = Field(None, description="URL dokumentu")
     language: str = Field("cs", description="Jazyk dokumentu")
-    full_text: Optional[str] = Field(None, description="Extrahovaný text dokumentu")
-    document_format: Optional[str] = Field(None, description="Formát dokumentu (pdf, docx)")
+    full_text: str | None = Field(None, description="Extrahovaný text dokumentu")
+    document_format: str | None = Field(None, description="Formát dokumentu (pdf, docx)")
 
 
 class AlternativeMedicine(BaseModel):
@@ -129,14 +128,14 @@ class AlternativeMedicine(BaseModel):
 
     sukl_code: str = Field(..., description="Kód SÚKL alternativy")
     name: str = Field(..., description="Název alternativního přípravku")
-    strength: Optional[str] = Field(None, description="Síla (např. '500mg')")
-    form: Optional[str] = Field(None, description="Léková forma (tableta, sirup, atd.)")
+    strength: str | None = Field(None, description="Síla (např. '500mg')")
+    form: str | None = Field(None, description="Léková forma (tableta, sirup, atd.)")
     is_available: bool = Field(True, description="Je dostupný na trhu")
-    has_reimbursement: Optional[bool] = Field(None, description="Má úhradu pojišťovny")
+    has_reimbursement: bool | None = Field(None, description="Má úhradu pojišťovny")
     relevance_score: float = Field(..., description="Relevance skóre 0-100")
     match_reason: str = Field(..., description="Důvod doporučení")
-    max_price: Optional[float] = Field(None, description="Maximální cena")
-    patient_copay: Optional[float] = Field(None, description="Doplatek pacienta")
+    max_price: float | None = Field(None, description="Maximální cena")
+    patient_copay: float | None = Field(None, description="Doplatek pacienta")
 
 
 class AvailabilityInfo(BaseModel):
@@ -150,7 +149,7 @@ class AvailabilityInfo(BaseModel):
     alternatives: list[AlternativeMedicine] = Field(
         default_factory=list, description="Seznam alternativních léčiv"
     )
-    recommendation: Optional[str] = Field(
+    recommendation: str | None = Field(
         None, description="Doporučení pro uživatele"
     )
     checked_at: datetime = Field(default_factory=datetime.now)
@@ -162,13 +161,13 @@ class ReimbursementInfo(BaseModel):
     sukl_code: str
     medicine_name: str
     is_reimbursed: bool = Field(..., description="Je hrazen")
-    reimbursement_group: Optional[str] = Field(None, description="Úhradová skupina")
-    max_producer_price: Optional[float] = Field(None, description="Max. cena výrobce")
-    max_retail_price: Optional[float] = Field(None, description="Max. cena v lékárně")
-    reimbursement_amount: Optional[float] = Field(None, description="Výše úhrady")
-    patient_copay: Optional[float] = Field(None, description="Doplatek pacienta")
+    reimbursement_group: str | None = Field(None, description="Úhradová skupina")
+    max_producer_price: float | None = Field(None, description="Max. cena výrobce")
+    max_retail_price: float | None = Field(None, description="Max. cena v lékárně")
+    reimbursement_amount: float | None = Field(None, description="Výše úhrady")
+    patient_copay: float | None = Field(None, description="Doplatek pacienta")
     has_indication_limit: bool = Field(False, description="Indikační omezení")
-    indication_limit_text: Optional[str] = Field(None, description="Text omezení")
+    indication_limit_text: str | None = Field(None, description="Text omezení")
     specialist_only: bool = Field(False, description="Pouze specialista")
 
 
@@ -182,23 +181,23 @@ class PharmacyInfo(BaseModel):
     name: str = Field(..., description="Název lékárny")
 
     # Adresa
-    street: Optional[str] = Field(None, description="Ulice a číslo")
+    street: str | None = Field(None, description="Ulice a číslo")
     city: str = Field(..., description="Město")
-    postal_code: Optional[str] = Field(None, description="PSČ")
-    district: Optional[str] = Field(None, description="Okres")
-    region: Optional[str] = Field(None, description="Kraj")
+    postal_code: str | None = Field(None, description="PSČ")
+    district: str | None = Field(None, description="Okres")
+    region: str | None = Field(None, description="Kraj")
 
     # Kontakt
-    phone: Optional[str] = Field(None, description="Telefon")
-    email: Optional[str] = Field(None, description="E-mail")
-    web: Optional[str] = Field(None, description="Web")
+    phone: str | None = Field(None, description="Telefon")
+    email: str | None = Field(None, description="E-mail")
+    web: str | None = Field(None, description="Web")
 
     # GPS
-    latitude: Optional[float] = Field(None, description="Zeměpisná šířka")
-    longitude: Optional[float] = Field(None, description="Zeměpisná délka")
+    latitude: float | None = Field(None, description="Zeměpisná šířka")
+    longitude: float | None = Field(None, description="Zeměpisná délka")
 
     # Provoz
-    operator: Optional[str] = Field(None, description="Provozovatel")
+    operator: str | None = Field(None, description="Provozovatel")
 
     # Služby
     has_24h_service: bool = Field(False, description="Nepřetržitý provoz")
@@ -218,5 +217,5 @@ class SearchResponse(BaseModel):
     query: str
     total_results: int
     results: list[MedicineSearchResult]
-    search_time_ms: Optional[float] = None
-    match_type: Optional[str] = Field(None, description="Typ matchování: substance/exact/substring/fuzzy/none")
+    search_time_ms: float | None = None
+    match_type: str | None = Field(None, description="Typ matchování: substance/exact/substring/fuzzy/none")

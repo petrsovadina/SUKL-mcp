@@ -80,7 +80,7 @@ class TestAsyncIOBehavior:
     @pytest.mark.asyncio
     async def test_zip_extraction_is_async(self):
         """_extract_zip() by měl být async a neblokovat event loop."""
-        from sukl_mcp.client_csv import SUKLDataLoader, SUKLConfig
+        from sukl_mcp.client_csv import SUKLConfig, SUKLDataLoader
 
         config = SUKLConfig()
         loader = SUKLDataLoader(config)
@@ -103,13 +103,13 @@ class TestAsyncIOBehavior:
             # Cleanup coroutine
             try:
                 await result
-            except:
+            except Exception:
                 pass
 
     @pytest.mark.asyncio
     async def test_csv_loading_is_parallel(self):
         """_load_csvs() by měl načítat CSV soubory paralelně."""
-        from sukl_mcp.client_csv import SUKLDataLoader, SUKLConfig
+        from sukl_mcp.client_csv import SUKLConfig, SUKLDataLoader
 
         config = SUKLConfig()
         loader = SUKLDataLoader(config)
@@ -156,7 +156,7 @@ class TestZipBombProtection:
     @pytest.mark.asyncio
     async def test_zip_bomb_detection(self):
         """Příliš velký ZIP by měl být odmítnut."""
-        from sukl_mcp.client_csv import SUKLDataLoader, SUKLConfig
+        from sukl_mcp.client_csv import SUKLConfig, SUKLDataLoader
 
         config = SUKLConfig()
         loader = SUKLDataLoader(config)
@@ -174,7 +174,7 @@ class TestZipBombProtection:
     @pytest.mark.asyncio
     async def test_acceptable_zip_size(self):
         """ZIP do 5 GB by měl projít."""
-        from sukl_mcp.client_csv import SUKLDataLoader, SUKLConfig
+        from sukl_mcp.client_csv import SUKLConfig, SUKLDataLoader
 
         config = SUKLConfig()
         loader = SUKLDataLoader(config)

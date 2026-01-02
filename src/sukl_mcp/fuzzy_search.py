@@ -8,9 +8,7 @@ Implementuje multi-level search pipeline:
 """
 
 import asyncio
-import concurrent.futures
 import logging
-from typing import Any, Optional
 
 import pandas as pd
 from rapidfuzz import fuzz, process
@@ -105,8 +103,8 @@ class FuzzyMatcher:
         self,
         query: str,
         df_medicines: pd.DataFrame,
-        df_composition: Optional[pd.DataFrame] = None,
-        df_substances: Optional[pd.DataFrame] = None,
+        df_composition: pd.DataFrame | None = None,
+        df_substances: pd.DataFrame | None = None,
         limit: int = 20,
     ) -> tuple[list[dict], str]:
         """
@@ -303,7 +301,7 @@ class FuzzyMatcher:
         names = candidates_df["NAZEV"].fillna("").tolist()
 
         # Wrapper pro rapidfuzz process.extract
-        def run_fuzzy_match():
+        def run_fuzzy_match() -> list[tuple[str, float, int]]:
             return process.extract(
                 query,
                 names,
@@ -353,7 +351,7 @@ class FuzzyMatcher:
 
 # === Singleton Instance ===
 
-_matcher: Optional[FuzzyMatcher] = None
+_matcher: FuzzyMatcher | None = None
 
 
 def get_fuzzy_matcher() -> FuzzyMatcher:

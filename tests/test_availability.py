@@ -16,7 +16,6 @@ import pytest
 from sukl_mcp.client_csv import SUKLClient
 from sukl_mcp.models import AvailabilityStatus
 
-
 # === Test Fixtures ===
 
 

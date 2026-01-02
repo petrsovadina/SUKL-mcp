@@ -24,7 +24,6 @@ from sukl_mcp.price_calculator import (
     has_reimbursement,
 )
 
-
 # === Test Fixtures ===
 
 

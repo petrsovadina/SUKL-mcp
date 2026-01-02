@@ -10,7 +10,7 @@ Implementuje práci s dlp_cau.csv (Cenové a úhradové údaje) včetně:
 
 import logging
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 
@@ -42,7 +42,7 @@ INDICATION_GROUP_COLUMNS = ["IND_SK", "INDIKACNI_SKUPINA", "INDICATION_GROUP"]
 # === Helper Functions ===
 
 
-def _find_column(df: pd.DataFrame, variants: list[str]) -> Optional[str]:
+def _find_column(df: pd.DataFrame, variants: list[str]) -> str | None:
     """
     Najdi sloupec z variantních názvů.
 
@@ -59,7 +59,7 @@ def _find_column(df: pd.DataFrame, variants: list[str]) -> Optional[str]:
     return None
 
 
-def _get_numeric_value(value: Any) -> Optional[float]:
+def _get_numeric_value(value: Any) -> float | None:
     """
     Konverze hodnoty na float, s graceful handling.
 
@@ -81,7 +81,7 @@ def _get_numeric_value(value: Any) -> Optional[float]:
         return None
 
 
-def _parse_date(value: Any) -> Optional[date]:
+def _parse_date(value: Any) -> date | None:
     """
     Parse datum z různých formátů.
 
@@ -121,8 +121,8 @@ def _parse_date(value: Any) -> Optional[date]:
 def get_price_data(
     df_cau: pd.DataFrame,
     sukl_code: str,
-    reference_date: Optional[date] = None,
-) -> Optional[dict[str, Any]]:
+    reference_date: date | None = None,
+) -> dict[str, Any] | None:
     """
     Získej cenová data pro konkrétní léčivo.
 
@@ -244,7 +244,7 @@ def has_reimbursement(df_cau: pd.DataFrame, sukl_code: str) -> bool:
     return price_data is not None and price_data.get("is_reimbursed", False)
 
 
-def get_reimbursement_amount(df_cau: pd.DataFrame, sukl_code: str) -> Optional[float]:
+def get_reimbursement_amount(df_cau: pd.DataFrame, sukl_code: str) -> float | None:
     """
     Získej výši úhrady pojišťovny.
 
