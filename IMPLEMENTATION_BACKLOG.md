@@ -1,10 +1,15 @@
-# SÚKL MCP Server - Implementation Backlog
+# SÚKL MCP Server - Implementation Backlog (ARCHIVED)
+
+> ⚠️ **ARCHIVOVÁNO**: Tento dokument obsahuje historický záznam implementace EPIC 1-4.  
+> Pro aktuální specifikaci a plán vývoje viz **[PRODUCT_SPECIFICATION.md](./PRODUCT_SPECIFICATION.md)**
+
 ## Specifikace: 4 Hlavní Moduly
 
 **Datum vytvoření**: 2025-12-30
 **Status**: COMPLETED - EPIC 1 ✅ | EPIC 2 ✅ | EPIC 3 ✅ | EPIC 4 ✅
 **Priorita**: High
 **Poslední aktualizace**: 2025-12-31
+**Nahrazeno**: PRODUCT_SPECIFICATION.md (v4.0)
 
 ---
 

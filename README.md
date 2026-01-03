@@ -4,12 +4,12 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastMCP](https://img.shields.io/badge/FastMCP-2.14+-green.svg)](https://gofastmcp.com)
-[![Version](https://img.shields.io/badge/version-3.0.0-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-4.0.0-brightgreen.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-197%20passed-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-219%20passed-success.svg)](tests/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> **v3.0.0** - Dokončeny všechny 4 EPICs: Parsování dokumentů (EPIC 1), Smart Search (EPIC 2), Cenové údaje (EPIC 3) a **Inteligentní alternativy** (EPIC 4). Celkem 197 testů, 100% pass rate. [Co je nového?](CHANGELOG.md)
+> **v4.0.0** - REST API migrace: Nový `SUKLAPIClient` pro real-time přístup k SÚKL databázi. Všechny 4 EPICs dokončeny, 219 testů. [Roadmapa →](PRODUCT_SPECIFICATION.md) | [Changelog →](CHANGELOG.md)
 
 ---
 
@@ -359,6 +359,7 @@ pytest tests/test_validation.py -v
 Kompletní dokumentace v **[docs/](docs/)** adresáři:
 
 ### Pro vývojáře
+- **[Product Specification](PRODUCT_SPECIFICATION.md)** - 📋 Vize, architektura, roadmapa vývoje
 - **[Getting Started](docs/index.md)** - Rychlý úvod a instalace
 - **[Architecture](docs/architecture.md)** - Systémová architektura (6 Mermaid diagramů)
 - **[API Reference](docs/api-reference.md)** - Kompletní dokumentace 7 MCP tools
