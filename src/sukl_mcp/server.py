@@ -4,6 +4,7 @@ SÚKL MCP Server - FastMCP server pro přístup k databázi léčiv.
 Poskytuje AI agentům přístup k české databázi léčivých přípravků.
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -11,7 +12,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
+from fastmcp.dependencies import Progress
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
@@ -895,6 +897,104 @@ async def get_atc_info(atc_code: str) -> dict:
     }
 
 
+# === Background Tasks (Week 3: FastMCP Best Practices) ===
+
+
+@mcp.tool(
+    task=True,  # NEW: Background task
+    tags={"availability", "batch", "background"},
+    annotations={"readOnlyHint": True, "idempotentHint": True},
+)
+async def batch_check_availability(
+    sukl_codes: list[str],
+    progress: Progress = Progress(),
+    ctx: Context | None = None,
+) -> dict:
+    """
+    Zkontroluje dostupnost více léčiv najednou na pozadí.
+
+    Asynchronní batch operace pro kontrolu dostupnosti více léčiv současně.
+    Podporuje progress tracking a běží na pozadí s in-memory nebo Redis backend.
+
+    Args:
+        sukl_codes: Seznam SÚKL kódů k ověření (např. ["0123456", "0234567"])
+        progress: Progress tracker (automaticky injektován)
+        ctx: Context pro logging (automaticky injektován, optional)
+
+    Returns:
+        Souhrn výsledků s celkovými statistikami a detaily pro každý lék
+
+    Examples:
+        - batch_check_availability(["0123456", "0234567"])
+        - batch_check_availability(["0123456", "0234567", "0345678", ...])  # až 100 léků
+
+    Note:
+        - Development: Používá in-memory backend (výchozí)
+        - Production: Vyžaduje Redis/Valkey pro distributed mode
+        - Rate limiting: 0.1s mezi jednotlivými kontrolami
+    """
+    if not sukl_codes:
+        return {"error": "No SÚKL codes provided", "total": 0, "available": 0, "results": []}
+
+    # Limit maximum batch size
+    if len(sukl_codes) > 100:
+        if ctx:
+            await ctx.warning(f"Batch size {len(sukl_codes)} exceeds limit 100, truncating")
+        sukl_codes = sukl_codes[:100]
+
+    await progress.set_total(len(sukl_codes))
+
+    if ctx:
+        await ctx.info(f"Starting batch availability check for {len(sukl_codes)} medicines")
+
+    results = []
+    available_count = 0
+
+    for i, code in enumerate(sukl_codes):
+        try:
+            await progress.set_message(f"Checking {code} ({i+1}/{len(sukl_codes)})")
+
+            # Call existing check_availability tool
+            result = await check_availability(code, include_alternatives=False)
+
+            is_available = result.is_available if result else False
+            if is_available:
+                available_count += 1
+
+            results.append({
+                "sukl_code": code,
+                "is_available": is_available,
+                "name": result.name if result else None,
+                "registration_number": result.registration_number if result else None,
+            })
+
+            await progress.increment()
+
+            # Rate limiting to prevent overload
+            await asyncio.sleep(0.1)
+
+        except Exception as e:
+            logger.warning(f"Error checking availability for {code}: {e}")
+            results.append({
+                "sukl_code": code,
+                "is_available": False,
+                "error": str(e),
+            })
+            await progress.increment()
+
+    if ctx:
+        await ctx.info(
+            f"Batch check complete: {available_count}/{len(sukl_codes)} medicines available"
+        )
+
+    return {
+        "total": len(sukl_codes),
+        "available": available_count,
+        "unavailable": len(sukl_codes) - available_count,
+        "results": results,
+    }
+
+
 # === MCP Resources (Best Practice) ===
 # Statická referenční data exponovaná přímo pro LLM
 
@@ -967,6 +1067,50 @@ async def get_database_statistics() -> dict:
         "unavailable_medicines": total_medicines - available_count,
         "data_source": "SÚKL Open Data",
         "server_version": "4.0.0",
+    }
+
+
+@mcp.resource("sukl://documents/{sukl_code}/availability")
+async def get_document_availability(sukl_code: str) -> dict:
+    """
+    Lehká kontrola dostupnosti dokumentů (PIL/SPC) pro daný lék.
+
+    Vrací informace o dostupnosti Příbalové informace (PIL) a Souhrnu
+    údajů o přípravku (SPC) bez stahování a parsování dokumentů.
+
+    Args:
+        sukl_code: SÚKL kód léčivého přípravku (např. "0123456")
+
+    Returns:
+        Informace o dostupnosti PIL a SPC dokumentů s URL
+
+    Examples:
+        - sukl://documents/0123456/availability
+        - sukl://documents/0234567/availability
+
+    Note:
+        - Lightweight check - nekontroluje skutečnou existenci souborů
+        - Pro stažení obsahu použijte nástroje get_pil_content nebo get_spc_content
+        - URL jsou standardizované podle SÚKL formátu
+    """
+    # Standardizované URL podle SÚKL konvence
+    base_url = "https://prehledy.sukl.cz"
+
+    return {
+        "sukl_code": sukl_code,
+        "pil": {
+            "url": f"{base_url}/pil/{sukl_code}.pdf",
+            "type": "Příbalová informace (PIL)",
+            "format": "pdf",
+            "description": "Informace pro pacienty v českém jazyce",
+        },
+        "spc": {
+            "url": f"{base_url}/spc/{sukl_code}.pdf",
+            "type": "Souhrn údajů o přípravku (SPC)",
+            "format": "pdf",
+            "description": "Odborné informace pro zdravotnické pracovníky",
+        },
+        "note": "Pro stažení a parsování obsahu použijte get_pil_content nebo get_spc_content",
     }
 
 
