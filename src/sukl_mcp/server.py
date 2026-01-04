@@ -1118,7 +1118,6 @@ async def batch_check_availability(
                 "sukl_code": code,
                 "is_available": is_available,
                 "name": result.name if result else None,
-                "registration_number": result.registration_number if result else None,
             })
 
             await progress.increment()
