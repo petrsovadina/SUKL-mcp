@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Literal
 
 from fastmcp import Context, FastMCP
-from fastmcp.dependencies import Progress
+from fastmcp.dependencies import Progress, CurrentContext
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
@@ -1063,7 +1063,7 @@ async def get_atc_info(
 async def batch_check_availability(
     sukl_codes: list[str],
     progress: Progress = Progress(),
-    ctx: Context | None = None,
+    ctx: Context = CurrentContext(),
 ) -> dict:
     """
     Zkontroluje dostupnost více léčiv najednou na pozadí.
@@ -1093,14 +1093,12 @@ async def batch_check_availability(
 
     # Limit maximum batch size
     if len(sukl_codes) > 100:
-        if ctx:
-            await ctx.warning(f"Batch size {len(sukl_codes)} exceeds limit 100, truncating")
+        await ctx.warning(f"Batch size {len(sukl_codes)} exceeds limit 100, truncating")
         sukl_codes = sukl_codes[:100]
 
     await progress.set_total(len(sukl_codes))
 
-    if ctx:
-        await ctx.info(f"Starting batch availability check for {len(sukl_codes)} medicines")
+    await ctx.info(f"Starting batch availability check for {len(sukl_codes)} medicines")
 
     results = []
     available_count = 0
@@ -1137,10 +1135,9 @@ async def batch_check_availability(
             })
             await progress.increment()
 
-    if ctx:
-        await ctx.info(
-            f"Batch check complete: {available_count}/{len(sukl_codes)} medicines available"
-        )
+    await ctx.info(
+        f"Batch check complete: {available_count}/{len(sukl_codes)} medicines available"
+    )
 
     return {
         "total": len(sukl_codes),
