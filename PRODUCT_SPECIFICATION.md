@@ -201,6 +201,11 @@
 - [ ] **Phase 04: Future Enhancements (v4.1.0+)**
   - [ ] Migrate remaining 6 tools to hybrid mode
   - [ ] Deprecation warnings pro CSV-only operations
+  - [ ] Circuit breaker pattern pro REST API failures
+    - Implementace: pybreaker library
+    - Konfigurace: fail_max=5, timeout_duration=60s
+    - Důvod odložení: Hybrid architecture má CSV fallback, circuit breaker má smysl až při 6+/10 tools na REST API
+    - Benefit: Rychlejší fail při API outage, snížení síťové zátěže
   - [ ] Monitoring & metrics (Prometheus/Grafana)
   - [ ] Background CSV sync job (caching strategy)
   - [ ] Persistent cache layer (Redis/SQLite)

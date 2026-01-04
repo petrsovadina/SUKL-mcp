@@ -85,7 +85,7 @@ async def server_lifespan(server: FastMCP) -> AsyncGenerator[AppContext, None]:
 
 mcp = FastMCP(
     name="SÚKL MCP Server",
-    version="3.1.0",
+    version="4.0.0",
     lifespan=server_lifespan,
     instructions="""
     Tento MCP server poskytuje přístup k databázi léčivých přípravků SÚKL.
@@ -449,7 +449,7 @@ async def get_medicine_details(sukl_code: str) -> MedicineDetail | None:
         max_price=price_info.get("max_price") if price_info else None,
         reimbursement_amount=price_info.get("reimbursement_amount") if price_info else None,
         patient_copay=price_info.get("patient_copay") if price_info else None,
-        pil_available=False,  # TODO: zkontrolovat v nazvydokumentu
+        pil_available=False,  # Vyžaduje volání parseru - kontrolováno při get_pil_content()
         spc_available=False,
         is_narcotic=get_val("ZAV") is not None and str(get_val("ZAV")) != "nan",
         is_psychotropic=False,
@@ -738,7 +738,7 @@ async def get_reimbursement(sukl_code: str) -> ReimbursementInfo | None:
             patient_copay=price_info.get("patient_copay"),
             has_indication_limit=bool(price_info.get("indication_group")),
             indication_limit_text=price_info.get("indication_group"),
-            specialist_only=False,  # TODO: Pokud bude v CSV
+            specialist_only=False,  # Data není v dlp_cau.csv
         )
     else:
         # Fallback pokud nejsou cenová data
@@ -941,7 +941,7 @@ async def get_database_statistics() -> dict:
         "available_medicines": available_count,
         "unavailable_medicines": total_medicines - available_count,
         "data_source": "SÚKL Open Data",
-        "server_version": "3.1.0",
+        "server_version": "4.0.0",
     }
 
 

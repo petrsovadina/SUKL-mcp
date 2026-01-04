@@ -5,20 +5,24 @@ All notable changes to SÚKL MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.0.0] - 2026-01-03
+## [4.0.0] - 2026-01-04
+
+### ⚠️ Version Notice
+- **pyproject.toml**: `version = "4.0.0"` ✅
+- **server.py**: `version = "4.0.0"` ✅ (opraveno)
+- **Actual Tests**: 241 (across 9 test files)
 
 ### Added - REST API Layer (Major Architecture Change)
 
 #### New API Module (`src/sukl_mcp/api/`)
-- **`SUKLAPIClient`** - Production-ready REST API client:
+- **`SUKLAPIClient`** - Production-ready REST API client (13,808 bytes):
   - Async context manager pattern (`async with SUKLAPIClient()`)
-  - Automatic retry with exponential backoff (3 attempts, configurable delay)
   - In-memory LRU cache with TTL (300s default, configurable)
   - Rate limiting with sliding window (60 req/min default)
   - Batch fetch with semaphore control (`get_medicines_batch()`)
   - Health check endpoint with latency measurement
   - Structured logging with operation metadata
-- **Pydantic v2 Models** (`api/models.py`):
+- **Pydantic v2 Models** (`api/models.py`, 6,144 bytes):
   - `APILecivyPripravek` - Medicine detail from `/dlp/v1/lecive-pripravky/{kod}`
   - `APISearchResponse` - Search results from `/dlp/v1/lecive-pripravky?nazev=...`
   - `APIHealthResponse` - Health check response
@@ -29,18 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `CacheEntry` - TTL-aware cache with timestamp validation
 
 #### Hybrid Search Architecture
-- **Dual-client initialization** (`server.py:56-81`):
+- **Dual-client initialization** (`server.py`):
   - Primary: REST API client (real-time data from prehledy.sukl.cz)
   - Fallback: CSV client (local cache, 68k records in-memory)
   - Health checks for both clients on startup
   - Graceful degradation strategy
-- **Helper function** `_try_rest_search()` (`server.py:173-232`):
+- **Helper function** `_try_rest_search()`:
   - Attempts REST API search first
   - Returns `(results, "rest_api")` on success
   - Returns `None` on failure (triggers CSV fallback)
   - Batch fetch with concurrent limit (5 parallel requests)
   - Data transformation: `APILecivyPripravek` → dict → Pydantic models
-- **Updated `search_medicine` tool** (`server.py:235-333`):
+- **Updated `search_medicine` tool**:
   - Try REST API first (via `_try_rest_search()`)
   - Automatic CSV fallback on API errors
   - Match type prefix: `rest_api` or `csv_{match_type}`
@@ -57,12 +61,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Health checks (2 tests)
   - Error handling (5 tests)
   - Batch operations (3 tests)
-- **4 integration tests** against live SÚKL API:
-  - Real search: "PARALEN" query (5 results)
-  - Real detail: medicine "0254045"
-  - Real health check (<100ms latency)
-  - Real batch fetch (10 medicines)
-- **100% pass rate** - All 241 tests passing (219 existing + 22 new)
+- **Total Test Suite**: 235 tests across 9 files:
+  - `test_api_client.py`: 22 tests
+  - `test_async_io.py`: 8 tests
+  - `test_availability.py`: 49 tests
+  - `test_document_parser.py`: 47 tests
+  - `test_fuzzy_search.py`: 34 tests
+  - `test_hybrid_tools.py`: 13 tests
+  - `test_performance_benchmark.py`: 3 tests
+  - `test_price_calculator.py`: 44 tests
+  - `test_validation.py`: 15 tests
+
+#### MCP Tools (8 total)
+Current registered tools in `server.py`:
+1. `search_medicine` - Vyhledávání léčivých přípravků (hybrid REST+CSV)
+2. `get_medicine_details` - Detaily konkrétního přípravku (hybrid)
+3. `get_pil_content` - Příbalové informace (PIL) s extrakcí textu
+4. `get_spc_content` - Souhrn údajů o přípravku (SPC)
+5. `check_availability` - Dostupnost léků s alternativami (hybrid)
+6. `get_reimbursement` - Informace o úhradách (CSV only)
+7. `find_pharmacies` - Vyhledávání lékáren
+8. `get_atc_info` - ATC klasifikace
 
 #### Development Tools
 - **Makefile targets**:
@@ -70,39 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `make api-health` - Quick API availability check
   - `make dev` - Full development workflow (format + test + lint)
 - **Documentation updates**:
-  - `docs/Phase-01-REST-API-Migration-Plan.md` - Implementation plan
-  - `PRODUCT_SPECIFICATION.md` - Updated with v4.0 status
+  - `PRODUCT_SPECIFICATION.md` - Comprehensive specification (466 lines)
+  - `DEFECTS_ANALYSIS.md` - Identified issues and remediation plan
   - `CLAUDE.md` - REST API architecture and patterns
-
-#### Performance Benchmark Results
-
-Comprehensive performance testing suite implemented (`tests/test_performance_benchmark.py`):
-
-**search_medicine:**
-- REST API cold: 0ms (p50), 58s (p95) - vysoký outlier při inicializaci
-- CSV fallback: 5ms (p50), 56ms (p95)
-- REST API warm: 1ms (p50), 60s (p95)
-- Winner: REST API s cache (10-13x faster)
-
-**get_medicine_details:**
-- REST API: 0ms (p50), 29ms (p95)
-- CSV: 13ms (p50), 23ms (p95)
-- Hybrid (REST + CSV price): 0ms (p50) - cache hit
-- Throughput: 181 ops/sec
-- Winner: REST API 1249x faster
-
-**check_availability:**
-- REST API: 0ms (p50), 35ms (p95)
-- CSV: 13ms (p50), 19ms (p95)
-- Full workflow (with alternatives): 1051ms (p50) - compute-intensive
-- Winner: REST API 1283x faster
-
-**Cache Statistics:**
-- Total entries: 1-42 (varies by test)
-- Valid entries: 100% hit rate
-- TTL: 5 minutes (optimal)
-
-**Overall Throughput:** 0.2 - 181 ops/sec (scenario-dependent)
 
 ### Changed
 
@@ -114,7 +103,6 @@ Comprehensive performance testing suite implemented (`tests/test_performance_ben
 
 #### Dependencies
 - Added `httpx>=0.25.0` - Async HTTP client for REST API
-- Added `tenacity>=8.0.0` - Retry logic with exponential backoff
 - Updated `pydantic>=2.0.0` - Full Pydantic v2 migration
 
 #### Performance
@@ -127,6 +115,25 @@ Comprehensive performance testing suite implemented (`tests/test_performance_ben
 - Pydantic v2 deprecation warnings (`class Config` → `model_config`)
 - All linting issues in new `api/` module (ruff + mypy clean)
 - Type hints for all public API methods (mypy strict mode)
+
+### Known Issues (from DEFECTS_ANALYSIS.md)
+
+#### 🔴 Priority 1 (Critical)
+1. **Missing Retry Logic**: `tenacity` library declared in pyproject.toml but NOT used in code
+   - Dependency: `tenacity>=8.0.0,<10.0.0` in pyproject.toml ✅
+   - Implementation: NO @retry decorators found in src/sukl_mcp/ ❌
+   - Impact: No automatic retry on transient API failures
+2. **Missing Input Validation**: Some tools lack proper validation
+3. **Missing Circuit Breaker**: No circuit breaker pattern for API failures
+
+#### 🟡 Priority 2 (Important)
+4. **Legacy CSV Client**: `client_csv.py` (903 lines) still primary, `api/client.py` (439 lines) is new REST layer
+5. **Hardcoded URLs**: API base URL should be configurable
+6. **Unfinished TODOs**: TODO comments in codebase
+
+#### 🟢 Priority 3 (Minor)
+7. **Version Mismatch**: Fixed - `server.py` now shows 4.0.0 ✅
+8. **Documentation Gaps**: Some docs reference outdated implementations
 
 ### Deprecated
 - **`src/sukl_mcp/client_csv.py`** - Legacy CSV client
@@ -165,23 +172,6 @@ async with SUKLAPIClient() as client:
     health = await client.health_check()
 ```
 
-#### Configuration
-```python
-from sukl_mcp.api import SUKLAPIClient, SUKLAPIConfig
-
-# Custom config
-config = SUKLAPIConfig(
-    base_url="https://prehledy.sukl.cz",  # Default
-    timeout=30.0,                          # Request timeout
-    max_retries=3,                         # Retry attempts
-    cache_ttl=300,                         # Cache TTL in seconds
-    rate_limit=60,                         # Max requests per minute
-)
-
-async with SUKLAPIClient(config) as client:
-    # Use client...
-```
-
 ### Performance Metrics
 
 | Operation | REST API | CSV Fallback | Target |
@@ -195,21 +185,22 @@ async with SUKLAPIClient(config) as client:
 - REST API doesn't provide price data (dlp_cau.csv) - CSV fallback required for `get_reimbursement()`
 - Cache is in-memory only (not persistent across restarts)
 - Rate limiting is client-side only (no server coordination)
+- **Retry logic not implemented** (planned for v4.1.0)
 
-### Completed in Phase-01 Migration (3/10 tools)
+### Completed in Phase-01 Migration (3/8 tools)
 - [x] Migrate `search_medicine()` to hybrid REST API + CSV fallback ✅
 - [x] Migrate `get_medicine_details()` to hybrid REST API + CSV fallback ✅
 - [x] Migrate `check_availability()` to hybrid REST API + CSV fallback ✅
 - [x] Document `get_reimbursement()` as CSV-only (no REST API equivalent) ✅
-- [x] Create integration test suite (13 tests, 11/13 passing) ✅
-- [x] Create performance benchmark suite (3 comprehensive benchmarks) ✅
 
 ### Next Steps (v4.1.0+ / Phase-02)
-- [ ] Migrate remaining 6 tools to hybrid mode
+- [ ] **Implement tenacity retry logic** (critical)
+- [ ] Fix version mismatch in server.py
+- [ ] Consolidate duplicate API clients
+- [ ] Migrate remaining 5 tools to hybrid mode
 - [ ] Add persistent cache layer (Redis/SQLite)
-- [ ] Implement server-side rate limiting coordination
+- [ ] Implement circuit breaker pattern
 - [ ] Add Prometheus metrics for monitoring
-- [ ] Deprecation warnings for pure CSV usage
 
 ## [3.1.0] - 2026-01-02
 
