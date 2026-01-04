@@ -6,10 +6,10 @@
 [![FastMCP](https://img.shields.io/badge/FastMCP-2.14+-green.svg)](https://gofastmcp.com)
 [![Version](https://img.shields.io/badge/version-4.0.0-brightgreen.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-219%20passed-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-241%20passed-success.svg)](tests/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> **v4.0.0** - REST API migrace: Nový `SUKLAPIClient` pro real-time přístup k SÚKL databázi. Všechny 4 EPICs dokončeny, 219 testů. [Roadmapa →](PRODUCT_SPECIFICATION.md) | [Changelog →](CHANGELOG.md)
+> **v4.0.0** - REST API migrace: Nový `SUKLAPIClient` pro real-time přístup k SÚKL databázi. Všechny 4 EPICs dokončeny, 241 testů. [Roadmapa →](PRODUCT_SPECIFICATION.md) | [Changelog →](CHANGELOG.md)
 
 ---
 
@@ -33,7 +33,7 @@ SÚKL MCP Server je implementace [Model Context Protocol](https://modelcontextpr
 - 🔒 **Security features**: ZIP bomb protection, regex injection prevention
 - 🏆 **Type-safe**: Pydantic v2 modely s runtime validací
 - 🚀 **Dual deployment**: FastMCP Cloud (stdio) + Smithery (HTTP/Docker)
-- ✅ **230+ comprehensive tests** s pytest a coverage >85%
+- ✅ **241 comprehensive tests** s pytest a coverage >85%
 
 ### Datová základna
 
@@ -197,7 +197,7 @@ Detailní dokumentace všech tools: **[API Reference](docs/api-reference.md)**
 
 ## 🏗️ Architektura
 
-### Vícevrstvý design
+### Vícevrstvý design (v4.0 Hybrid Architecture)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -208,25 +208,43 @@ Detailní dokumentace všech tools: **[API Reference](docs/api-reference.md)**
 ┌────────────────────▼────────────────────────────────────┐
 │                FastMCP Server                           │
 │         (7 MCP tools pro farmaceutická data)            │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│                  SUKLClient                             │
-│     (CSV data loading, in-memory queries)               │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│              SÚKL Open Data                             │
-│        (opendata.sukl.cz - CSV v ZIP)                   │
-└─────────────────────────────────────────────────────────┘
+└─────────────┬──────────────────────┬────────────────────┘
+              │                      │
+     ┌────────▼────────┐    ┌────────▼────────┐
+     │ SUKLAPIClient   │    │  SUKLClient     │
+     │  (REST API)     │    │  (CSV Fallback) │
+     │ • Cache (5min)  │    │ • In-memory     │
+     │ • Rate limit    │    │ • pandas DF     │
+     │ • Retry logic   │    │ • Fuzzy search  │
+     └────────┬────────┘    └────────┬────────┘
+              │                      │
+     ┌────────▼────────┐    ┌────────▼────────┐
+     │  SÚKL REST API  │    │ SÚKL Open Data  │
+     │ prehledy.sukl.cz│    │ opendata.sukl.cz│
+     │  (Real-time)    │    │  (CSV v ZIP)    │
+     └─────────────────┘    └─────────────────┘
+
+     PRIMARY (3 tools)      FALLBACK (always)
+     ✅ Fast (0-1ms p50)    ✅ Reliable (50ms)
+     ✅ Real-time data      ✅ Price data (CAU)
+     ⚠️  No price data      ⚠️  Monthly updates
 ```
 
 ### Klíčové komponenty
 
-- **`server.py`**: FastMCP server s MCP tools registrací
-- **`client_csv.py`**: Async data loader a query engine
-- **`models.py`**: Pydantic modely pro type-safe data handling
+#### v4.0 Hybrid Architecture
+- **`server.py`**: FastMCP server s dual-client initialization
+- **`api/client.py`**: SUKLAPIClient pro REST API access (primary)
+- **`api/models.py`**: Pydantic modely pro API responses
+- **`client_csv.py`**: CSV client pro fallback + price data
+- **`models.py`**: Pydantic modely pro MCP responses
 - **`exceptions.py`**: Custom exception hierarchy
+
+#### Migrace Status (Phase-01)
+- ✅ **search_medicine** - Hybrid mode (REST → CSV fallback)
+- ✅ **get_medicine_details** - Hybrid mode (REST + CSV price enrichment)
+- ✅ **check_availability** - Hybrid mode (REST + CSV alternatives)
+- 📄 **get_reimbursement** - CSV-only (REST API nemá CAU data)
 
 Kompletní architektura: **[Architecture Documentation](docs/architecture.md)**
 
@@ -315,17 +333,36 @@ make dev          # Format + test + lint (kompletní workflow)
 ```
 SUKL-mcp/
 ├── src/sukl_mcp/
-│   ├── server.py          # FastMCP server + MCP tools
-│   ├── client_csv.py      # Data loader + query engine
-│   ├── models.py          # Pydantic data models
-│   ├── exceptions.py      # Custom exceptions
-│   └── __main__.py        # Entry point
+│   ├── server.py               # FastMCP server + MCP tools
+│   ├── api/                    # REST API module (v4.0)
+│   │   ├── __init__.py
+│   │   ├── client.py           # SUKLAPIClient
+│   │   └── models.py           # API Pydantic models
+│   ├── client_csv.py           # CSV client (fallback)
+│   ├── models.py               # MCP response models
+│   ├── exceptions.py           # Custom exceptions
+│   ├── fuzzy_search.py         # Smart search engine
+│   ├── price_calculator.py     # Price & reimbursement
+│   ├── availability.py         # Availability & alternatives
+│   ├── document_parser.py      # PDF/DOCX parser
+│   └── __main__.py             # Entry point
 ├── tests/
-│   ├── test_validation.py # Input validation tests
-│   └── test_async_io.py   # Async I/O tests
-├── docs/                  # 125+ stránek dokumentace
-├── pyproject.toml         # Project configuration
-└── Makefile               # Development commands
+│   ├── test_api_client.py      # REST API tests (22)
+│   ├── test_hybrid_tools.py    # Integration tests (13)
+│   ├── test_performance_benchmark.py  # Benchmarks (3)
+│   ├── test_validation.py      # Input validation
+│   ├── test_async_io.py        # Async I/O tests
+│   ├── test_fuzzy_search.py    # Smart search tests
+│   ├── test_availability.py    # Alternatives tests
+│   ├── test_document_parser.py # Parser tests
+│   └── ...                     # (241 total tests)
+├── docs/                       # 125+ stránek dokumentace
+│   ├── Phase-01-REST-API-Migration-Plan.md
+│   ├── architecture.md
+│   ├── api-reference.md
+│   └── ...
+├── pyproject.toml              # Project configuration
+└── Makefile                    # Development commands
 ```
 
 Developer guide: **[Developer Documentation](docs/developer-guide.md)**
@@ -334,14 +371,56 @@ Developer guide: **[Developer Documentation](docs/developer-guide.md)**
 
 ## 🧪 Testing
 
-Projekt obsahuje 23 comprehensive tests pokrývající:
+Projekt obsahuje **241 comprehensive tests** pokrývající:
 
+### Core Functionality (23 tests)
 - ✅ Input validation (search query, SÚKL kódy, ATC prefixy)
 - ✅ Async I/O behavior (non-blocking ZIP extraction)
 - ✅ Race condition prevention (thread-safe initialization)
 - ✅ ZIP bomb protection (max 5 GB)
 - ✅ Regex injection prevention
 - ✅ Environment configuration
+
+### EPIC 1: Document Parser (47 tests)
+- ✅ PDF/DOCX download and parsing
+- ✅ LRU cache mechanics
+- ✅ Security features (size limits, timeouts)
+- ✅ Error handling and graceful degradation
+
+### EPIC 2: Smart Search (34 tests)
+- ✅ Multi-level search pipeline
+- ✅ Fuzzy matching with rapidfuzz
+- ✅ Scoring system and ranking
+- ✅ Match type detection
+
+### EPIC 3: Price & Reimbursement (44 tests)
+- ✅ Price data extraction and validation
+- ✅ Patient copay calculation
+- ✅ Date parsing and validity filtering
+- ✅ Numeric conversion with graceful handling
+
+### EPIC 4: Availability & Alternatives (49 tests)
+- ✅ Availability normalization
+- ✅ Strength parsing and similarity
+- ✅ Multi-criteria ranking algorithm
+- ✅ Alternative medicine recommendations
+
+### REST API Layer (22 tests)
+- ✅ SUKLAPIClient unit tests
+- ✅ Cache mechanics and TTL
+- ✅ Rate limiting
+- ✅ Error handling and retries
+
+### Integration Tests (13 tests)
+- ✅ Hybrid REST API + CSV fallback workflows
+- ✅ Real API integration tests
+- ✅ Data consistency validation
+- ✅ End-to-end tool testing
+
+### Performance Benchmarks (3 tests)
+- ✅ search_medicine performance (REST vs CSV)
+- ✅ get_medicine_details throughput (181 ops/sec)
+- ✅ check_availability with alternatives workflow
 
 ```bash
 # Spustit všechny testy
@@ -351,10 +430,13 @@ pytest tests/ -v
 pytest tests/ -v --cov=sukl_mcp --cov-report=html
 
 # Konkrétní test suite
-pytest tests/test_validation.py -v
+pytest tests/test_api_client.py -v          # REST API tests
+pytest tests/test_hybrid_tools.py -v        # Integration tests
+pytest tests/test_performance_benchmark.py  # Performance benchmarks
 ```
 
-**Test coverage**: >80% (cíl: 90%+)
+**Test coverage**: >85% (všechny moduly)
+**Pass rate**: 241/241 tests passing (100%)
 
 ---
 

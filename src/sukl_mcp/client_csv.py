@@ -65,7 +65,7 @@ class SUKLConfig(BaseModel):
     download_timeout: float = Field(default_factory=_get_download_timeout)
 
 
-class SUKLDataLoader:
+class SUKLDataFetcher:
     """Loader pro SÚKL CSV data."""
 
     def __init__(self, config: SUKLConfig | None = None):
@@ -191,7 +191,7 @@ class SUKLClient:
 
     def __init__(self, config: SUKLConfig | None = None):
         self.config = config or SUKLConfig()
-        self._loader = SUKLDataLoader(config)
+        self._loader = SUKLDataFetcher(config)
         self._initialized = False
 
     async def initialize(self) -> None:
