@@ -45,6 +45,9 @@ coverage.xml
 nosetests.xml
 test-results/
 
+# Test artifacts & temporary files
+test_production_server.py
+
 # Type checking & linting
 .mypy_cache/
 .ruff_cache/
@@ -60,6 +63,8 @@ dmypy.json
 .DS_Store
 .AppleDouble
 .LSOverride
+*_2
+*_3
 
 # IDE
 .vscode/
@@ -90,6 +95,9 @@ logs/
 
 # Claude local settings
 .claude/
+
+# Legacy AI configs
+.serena/
 
 # Python version manager
 .python-version

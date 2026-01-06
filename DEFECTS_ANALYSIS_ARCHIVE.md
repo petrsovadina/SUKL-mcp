@@ -1,7 +1,12 @@
-# 🔴 Analýza nedostatků projektu SUKL MCP Server
+# 🔴 Analýza nedostatků projektu SUKL MCP Server [ARCHIVED]
 
-**Datum analýzy**: 4. ledna 2026  
-**Analyzovaná verze**: 3.1.0  
+> ✅ **VŠECHNY KRITICKÉ ISSUES VYŘEŠENY VE VERZI v4.0.1**
+> Tento dokument je archivován pro historické účely.
+> Aktuální stav: [TESTOVANI_FAZE1_FAZE2.md](TESTOVANI_FAZE1_FAZE2.md) | [CHANGELOG.md](CHANGELOG.md)
+
+**Datum analýzy**: 4. ledna 2026
+**Analyzovaná verze**: 3.1.0
+**Stav**: ✅ Vyřešeno ve v4.0.1 (5. ledna 2026)
 **Autor**: Automatická analýza codebase
 
 ---
