@@ -9,6 +9,7 @@ Implementuje multi-level search pipeline:
 
 import asyncio
 import logging
+import threading
 from typing import Any, cast
 
 import pandas as pd
@@ -299,7 +300,7 @@ class FuzzyMatcher:
 
         # Random sampling pro lepší coverage při zachování performance
         if len(df_medicines) > self.candidate_limit:
-            candidates_df = df_medicines.sample(n=self.candidate_limit, random_state=42)
+            candidates_df = df_medicines.sample(n=self.candidate_limit)
         else:
             candidates_df = df_medicines
 
@@ -361,16 +362,23 @@ class FuzzyMatcher:
 # === Singleton Instance ===
 
 _matcher: FuzzyMatcher | None = None
+_matcher_lock = threading.Lock()
 
 
 def get_fuzzy_matcher() -> FuzzyMatcher:
     """
     Získej singleton instanci FuzzyMatcher.
 
+    Thread-safe s použitím double-checked locking pattern.
+
     Returns:
         FuzzyMatcher instance
     """
     global _matcher
-    if _matcher is None:
-        _matcher = FuzzyMatcher()
+    if _matcher is not None:
+        return _matcher
+
+    with _matcher_lock:
+        if _matcher is None:
+            _matcher = FuzzyMatcher()
     return _matcher
