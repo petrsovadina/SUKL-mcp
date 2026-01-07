@@ -71,6 +71,17 @@ async def server_lifespan(server: FastMCP) -> AsyncGenerator[AppContext, None]:
     csv_health = await csv_client.health_check()
     logger.info(f"CSV client health: {csv_health}")
 
+    # Validace kritických tabulek (fail-fast)
+    critical_tables = ["dlp_lecivepripravky", "dlp_atc"]
+    for table_name in critical_tables:
+        df = csv_client._loader.get_table(table_name)
+        if df is None or df.empty:
+            raise RuntimeError(
+                f"CRITICAL: Table '{table_name}' failed to load or is empty! "
+                f"Server cannot start without essential data."
+            )
+    logger.info(f"Critical tables validated: {', '.join(critical_tables)}")
+
     # Vrať typovaný kontext
     yield AppContext(
         client=csv_client,
@@ -1247,12 +1258,12 @@ async def get_top_level_atc_groups() -> dict:
     # Filtruj pouze top-level skupiny (1 znak) a přidej URI
     top_level = [
         {
-            "code": g.get("kod", g.get("KOD", "")),
+            "code": g.get("ATC", g.get("atc", "")),
             "name": g.get("nazev", g.get("NAZEV", "")),
-            "uri": f"sukl://atc/{g.get('kod', g.get('KOD', ''))}",  # Add navigation URI
+            "uri": f"sukl://atc/{g.get('ATC', g.get('atc', ''))}",  # Add navigation URI
         }
         for g in groups
-        if len(g.get("kod", g.get("KOD", ""))) == 1
+        if len(g.get("ATC", g.get("atc", ""))) == 1
     ]
 
     return {
@@ -1283,14 +1294,14 @@ async def get_atc_by_level(level: int) -> dict:
     code_lengths = {1: 1, 2: 3, 3: 4, 4: 5, 5: 7}
     target_length = code_lengths[level]
 
-    filtered = df[df["KOD"].str.len() == target_length]
+    filtered = df[df["ATC"].str.len() == target_length]
 
     return {
         "level": level,
         "total": len(filtered),
         "codes": [
             {
-                "code": row["KOD"],
+                "code": row["ATC"],
                 "name": row["NAZEV"],
                 "name_en": row.get("NAZEV_EN"),
             }
@@ -1314,7 +1325,7 @@ async def get_atc_code_resource(code: str) -> dict:
     df = client._loader.get_table("dlp_atc")
 
     # Get current code
-    current = df[df["KOD"] == code.upper()]
+    current = df[df["ATC"] == code.upper()]
     if current.empty:
         return {"error": f"ATC code {code} not found", "code": code}
 
@@ -1336,18 +1347,18 @@ async def get_atc_code_resource(code: str) -> dict:
     # Get children (1 level down)
     children = []
     if level < 5:  # Not at substance level
-        child_df = df[df["KOD"].str.startswith(code) & (df["KOD"].str.len() > code_len)]
+        child_df = df[df["ATC"].str.startswith(code) & (df["ATC"].str.len() > code_len)]
         # Group by next level length
         next_lengths = {1: 3, 3: 4, 4: 5, 5: 7}
         next_len = next_lengths.get(code_len)
         if next_len:
-            child_df = child_df[child_df["KOD"].str.len() == next_len]
+            child_df = child_df[child_df["ATC"].str.len() == next_len]
             children = [
-                {"code": c["KOD"], "name": c["NAZEV"]} for _, c in child_df.head(20).iterrows()
+                {"code": c["ATC"], "name": c["NAZEV"]} for _, c in child_df.head(20).iterrows()
             ]
 
     return {
-        "code": row["KOD"],
+        "code": row["ATC"],
         "name": row["NAZEV"],
         "name_en": row.get("NAZEV_EN"),
         "level": level,
@@ -1371,16 +1382,16 @@ async def get_atc_subtree(root_code: str) -> dict:
     df = client._loader.get_table("dlp_atc")
 
     # Get all codes starting with root_code
-    subtree = df[df["KOD"].str.startswith(root_code.upper())]
+    subtree = df[df["ATC"].str.startswith(root_code.upper())]
 
     return {
         "root_code": root_code.upper(),
         "total_descendants": len(subtree),
         "codes": [
             {
-                "code": row["KOD"],
+                "code": row["ATC"],
                 "name": row["NAZEV"],
-                "level": {1: 1, 3: 2, 4: 3, 5: 4, 7: 5}.get(len(row["KOD"]), 0),
+                "level": {1: 1, 3: 2, 4: 3, 5: 4, 7: 5}.get(len(row["ATC"]), 0),
             }
             for _, row in subtree.head(100).iterrows()
         ],
@@ -1499,11 +1510,11 @@ async def get_detailed_statistics() -> dict:
     atc_counts = {}
     if atc_df is not None:
         atc_counts = {
-            "level_1": len(atc_df[atc_df["KOD"].str.len() == 1]),
-            "level_2": len(atc_df[atc_df["KOD"].str.len() == 3]),
-            "level_3": len(atc_df[atc_df["KOD"].str.len() == 4]),
-            "level_4": len(atc_df[atc_df["KOD"].str.len() == 5]),
-            "level_5": len(atc_df[atc_df["KOD"].str.len() == 7]),
+            "level_1": len(atc_df[atc_df["ATC"].str.len() == 1]),
+            "level_2": len(atc_df[atc_df["ATC"].str.len() == 3]),
+            "level_3": len(atc_df[atc_df["ATC"].str.len() == 4]),
+            "level_4": len(atc_df[atc_df["ATC"].str.len() == 5]),
+            "level_5": len(atc_df[atc_df["ATC"].str.len() == 7]),
         }
 
     # Pharmacies
