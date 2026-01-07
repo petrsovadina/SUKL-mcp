@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from rapidfuzz import fuzz
 from fastmcp import Context, FastMCP
@@ -1126,6 +1126,7 @@ async def get_atc_info(
     task=True,  # NEW: Background task
     tags={"availability", "batch", "background"},
     annotations={"readOnlyHint": True, "idempotentHint": True},
+    exclude_args=["progress", "ctx"],  # Exclude DI params from schema
 )
 async def batch_check_availability(
     sukl_codes: list[str],
