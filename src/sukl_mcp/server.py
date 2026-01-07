@@ -1100,7 +1100,7 @@ async def get_atc_info(
     children = []
 
     for group in groups:
-        code = group.get("kod", group.get("KOD", ""))
+        code = group.get("ATC", group.get("atc", ""))
         if code == atc_code:
             target = group
         elif code.startswith(atc_code) and len(code) > len(atc_code):
