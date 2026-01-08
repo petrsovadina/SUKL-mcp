@@ -9,6 +9,7 @@ Implementuje multi-level search pipeline:
 
 import asyncio
 import logging
+import threading
 from typing import Any, cast
 
 import pandas as pd
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # === Configuration ===
 
-FUZZY_THRESHOLD = 80  # Minimální skóre pro fuzzy match (0-100)
+FUZZY_THRESHOLD = 70  # Minimální skóre pro fuzzy match (0-100) - sníženo pro lepší recall
 FUZZY_MIN_QUERY_LENGTH = 3  # Minimální délka query pro fuzzy search
 FUZZY_CANDIDATE_LIMIT = 1000  # Max kandidátů pro fuzzy matching
 
@@ -297,8 +298,11 @@ class FuzzyMatcher:
         """
         loop = asyncio.get_running_loop()
 
-        # Limit kandidátů pro performance
-        candidates_df = df_medicines.head(self.candidate_limit)
+        # Random sampling pro lepší coverage při zachování performance
+        if len(df_medicines) > self.candidate_limit:
+            candidates_df = df_medicines.sample(n=self.candidate_limit)
+        else:
+            candidates_df = df_medicines
 
         # Extrahuj názvy pro fuzzy matching
         names = candidates_df["NAZEV"].fillna("").tolist()
@@ -358,16 +362,23 @@ class FuzzyMatcher:
 # === Singleton Instance ===
 
 _matcher: FuzzyMatcher | None = None
+_matcher_lock = threading.Lock()
 
 
 def get_fuzzy_matcher() -> FuzzyMatcher:
     """
     Získej singleton instanci FuzzyMatcher.
 
+    Thread-safe s použitím double-checked locking pattern.
+
     Returns:
         FuzzyMatcher instance
     """
     global _matcher
-    if _matcher is None:
-        _matcher = FuzzyMatcher()
+    if _matcher is not None:
+        return _matcher
+
+    with _matcher_lock:
+        if _matcher is None:
+            _matcher = FuzzyMatcher()
     return _matcher

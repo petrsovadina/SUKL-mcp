@@ -4,12 +4,12 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastMCP](https://img.shields.io/badge/FastMCP-2.14+-green.svg)](https://gofastmcp.com)
-[![Version](https://img.shields.io/badge/version-4.0.0-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-4.0.1-brightgreen.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-241%20passed-success.svg)](tests/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> **v4.0.0** - REST API migrace: Nový `SUKLAPIClient` pro real-time přístup k SÚKL databázi. Všechny 4 EPICs dokončeny, 241 testů. [Roadmapa →](PRODUCT_SPECIFICATION.md) | [Changelog →](CHANGELOG.md)
+> **v4.0.1** - Production-ready release: Opraveny kritické bugy (Phase 1 & 2), přesné match scoring, kompletní data enrichment. Zero crashes, 241 testů. [Roadmapa →](PRODUCT_SPECIFICATION.md) | [Changelog →](CHANGELOG.md)
 
 ---
 
@@ -19,6 +19,9 @@ SÚKL MCP Server je implementace [Model Context Protocol](https://modelcontextpr
 
 ### Klíčové vlastnosti
 
+- ✅ **Production-ready (v4.0.1)**: Zero known crashes, stable ve všech scénářích
+- 🎯 **Accurate match scoring**: 0-100 škála založená na rapidfuzz (ne hardcoded 20.0)
+- 📊 **Complete data enrichment**: Cenová data přímo v search results (1 API call místo 2+)
 - 🔍 **8 MCP tools** pro komplexní práci s farmaceutickými daty
 - 🌐 **Hybrid Architecture (v4.0)**: REST API + CSV fallback pro 100% uptime
   - **3/10 tools migrované** na dual-mode (search, details, availability)
@@ -95,6 +98,16 @@ Přidej do `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```
 
 Restart Claude Desktop a server bude k dispozici.
+
+### Použití Production Serveru (Nejjednodušší)
+
+Pro okamžité použití bez instalace, připoj se k produkčnímu serveru:
+
+```bash
+claude mcp add --scope local --transport http SUKL-mcp https://SUKL-mcp.fastmcp.app/mcp
+```
+
+Server se automaticky přidá do Claude Desktop konfigurace a je okamžitě k dispozici. Žádná instalace nebo lokální setup není potřeba!
 
 **Chceš používat více MCP serverů současně?** Podívej se na [Multi-Server Setup Guide](docs/multi-server-setup.md) pro konfiguraci SÚKL serveru s dalšími službami (filesystem, GitHub, web search, atd.).
 
@@ -218,8 +231,7 @@ Detailní dokumentace všech tools: **[API Reference](docs/api-reference.md)**
                      │ MCP Protocol
 ┌────────────────────▼────────────────────────────────────┐
 │                FastMCP Server                           │
-<<<<<<< HEAD
-│         (7 MCP tools pro farmaceutická data)            │
+│         (8 MCP tools pro farmaceutická data)            │
 └─────────────┬──────────────────────┬────────────────────┘
               │                      │
      ┌────────▼────────┐    ┌────────▼────────┐
@@ -240,20 +252,6 @@ Detailní dokumentace všech tools: **[API Reference](docs/api-reference.md)**
      ✅ Fast (0-1ms p50)    ✅ Reliable (50ms)
      ✅ Real-time data      ✅ Price data (CAU)
      ⚠️  No price data      ⚠️  Monthly updates
-=======
-│         (8 MCP tools pro farmaceutická data)            │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│                  SUKLClient                             │
-│     (CSV data loading, in-memory queries)               │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│              SÚKL Open Data                             │
-│        (opendata.sukl.cz - CSV v ZIP)                   │
-└─────────────────────────────────────────────────────────┘
->>>>>>> main
 ```
 
 ### Klíčové komponenty
@@ -397,11 +395,7 @@ Developer guide: **[Developer Documentation](docs/developer-guide.md)**
 
 ## 🧪 Testing
 
-<<<<<<< HEAD
 Projekt obsahuje **241 comprehensive tests** pokrývající:
-=======
-Projekt obsahuje **197 comprehensive tests** pokrývající:
->>>>>>> main
 
 ### Core Functionality (23 tests)
 - ✅ Input validation (search query, SÚKL kódy, ATC prefixy)

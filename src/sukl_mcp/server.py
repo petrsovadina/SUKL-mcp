@@ -4,15 +4,17 @@ SÚKL MCP Server - FastMCP server pro přístup k databázi léčiv.
 Poskytuje AI agentům přístup k české databázi léčivých přípravků.
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
+from rapidfuzz import fuzz
 from fastmcp import Context, FastMCP
-from fastmcp.dependencies import Progress
+from fastmcp.dependencies import Progress, CurrentContext
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
@@ -68,6 +70,17 @@ async def server_lifespan(server: FastMCP) -> AsyncGenerator[AppContext, None]:
     await csv_client.initialize()  # Cold Start fix
     csv_health = await csv_client.health_check()
     logger.info(f"CSV client health: {csv_health}")
+
+    # Validace kritických tabulek (fail-fast)
+    critical_tables = ["dlp_lecivepripravky", "dlp_atc"]
+    for table_name in critical_tables:
+        df = csv_client._loader.get_table(table_name)
+        if df is None or df.empty:
+            raise RuntimeError(
+                f"CRITICAL: Table '{table_name}' failed to load or is empty! "
+                f"Server cannot start without essential data."
+            )
+    logger.info(f"Critical tables validated: {', '.join(critical_tables)}")
 
     # Vrať typovaný kontext
     yield AppContext(
@@ -169,6 +182,55 @@ Srovnej:
 Použij search_medicine pro oba léky a get_reimbursement pro cenové údaje."""
 
 
+# === Helper Functions ===
+
+
+def _calculate_match_quality(query: str, medicine_name: str) -> tuple[float, str]:
+    """
+    Vypočítá match score a typ na základě similarity query a názvu léku.
+
+    Args:
+        query: Hledaný výraz (case-insensitive)
+        medicine_name: Název léku z API
+
+    Returns:
+        tuple[float, str]: (match_score, match_type)
+            - match_score: 0-100 (vyšší = lepší shoda)
+            - match_type: "exact" | "substring" | "fuzzy"
+    """
+    query_lower = query.lower().strip()
+    name_lower = medicine_name.lower().strip()
+
+    # 1. Exact match - absolutní shoda
+    if query_lower == name_lower:
+        return 100.0, "exact"
+
+    # 2. Substring match - query je podřetězec názvu
+    if query_lower in name_lower:
+        # Score based on length ratio (delší match = vyšší score)
+        ratio = len(query_lower) / len(name_lower)
+        score = 80.0 + (ratio * 15.0)  # 80-95 range
+        return score, "substring"
+
+    # 3. Fuzzy match - podobnost pomocí rapidfuzz
+    fuzzy_score = fuzz.ratio(query_lower, name_lower)
+
+    if fuzzy_score >= 80:
+        return fuzzy_score, "fuzzy"
+
+    # 4. Partial ratio - pro částečné shody
+    partial_score = fuzz.partial_ratio(query_lower, name_lower)
+
+    if partial_score >= 80:
+        return partial_score * 0.9, "fuzzy"  # Mírně nižší score pro partial
+
+    # 5. Token sort ratio - ignoruje pořadí slov
+    token_score = fuzz.token_sort_ratio(query_lower, name_lower)
+
+    # Odstraněn minimum score floor pro lepší filtrování irelevantních výsledků
+    return token_score * 0.8, "fuzzy"
+
+
 # === MCP Tools ===
 
 
@@ -197,8 +259,8 @@ async def _try_rest_search(
         )
 
         if not search_result.codes:
-            logger.info(f"REST API: žádné výsledky pro '{query}'")
-            return [], "rest_api"
+            logger.info(f"REST API: žádné výsledky pro '{query}' - falling back to CSV")
+            return None  # Force CSV fallback when REST API returns no results
 
         # Batch fetch details
         medicines = await api_client.get_medicines_batch(
@@ -208,6 +270,9 @@ async def _try_rest_search(
         # Convert APILecivyPripravek -> dict pro kompatibilitu
         results = []
         for med in medicines:
+            # Calculate actual match quality based on query vs medicine name
+            match_score, match_type = _calculate_match_quality(query, med.nazev)
+
             results.append(
                 {
                     "kod_sukl": med.kodSUKL,
@@ -220,14 +285,18 @@ async def _try_rest_search(
                     "stav_registrace": med.stavRegistraceKod,
                     "vydej": med.zpusobVydejeKod,
                     "dostupnost": "ano" if med.jeDodavka else "ne",
-                    # Match metadata (REST API vrací exact match)
-                    "match_score": 20.0,
-                    "match_type": "exact",
+                    # Match metadata - calculated based on actual similarity
+                    "match_score": match_score,
+                    "match_type": match_type,
                 }
             )
 
-        logger.info(f"✅ REST API: {len(results)}/{len(search_result.codes)} results")
-        return results, "rest_api"
+        # Enrich with price data from CSV (REST API doesn't have price fields)
+        csv_client = await get_sukl_client()
+        enriched_results = await csv_client._enrich_with_price_data(results)
+
+        logger.info(f"✅ REST API: {len(enriched_results)}/{len(search_result.codes)} results (enriched)")
+        return enriched_results, "rest_api"
 
     except (SUKLAPIError, Exception) as e:
         logger.warning(f"⚠️  REST API search failed: {e}")
@@ -500,7 +569,8 @@ async def get_medicine_details(
         is_available=get_val("DODAVKY") != "0",
         is_marketed=True,  # Pokud je v databázi, je registrován
         # Cenové údaje z dlp_cau (EPIC 3)
-        has_reimbursement=price_info.get("is_reimbursed", False) if price_info else False,
+        # Note: None = data unavailable, False = not reimbursed, True = reimbursed
+        has_reimbursement=price_info.get("is_reimbursed") if price_info else None,
         max_price=price_info.get("max_price") if price_info else None,
         reimbursement_amount=price_info.get("reimbursement_amount") if price_info else None,
         patient_copay=price_info.get("patient_copay") if price_info else None,
@@ -732,13 +802,13 @@ async def check_availability(
 
     is_available = availability == AvailabilityStatus.AVAILABLE
 
-    # Hledání alternativ (pouze pokud není dostupný)
+    # Hledání alternativ (pokud je požadováno)
     alternatives = []
     recommendation = None
 
-    if include_alternatives and not is_available:
+    if include_alternatives:
         if ctx:
-            await ctx.info("Medicine not available, searching for alternatives")
+            await ctx.info("Searching for alternatives")
 
         # Použij find_generic_alternatives pro nalezení alternativ
         alt_results = await csv_client.find_generic_alternatives(sukl_code, limit=limit)
@@ -766,12 +836,21 @@ async def check_availability(
         # Generuj doporučení
         if alternatives:
             top_alt = alternatives[0]
-            recommendation = (
-                f"Tento přípravek není dostupný. "
-                f"Doporučujeme alternativu: {top_alt.name} "
-                f"(relevance: {top_alt.relevance_score:.0f}/100, "
-                f"důvod: {top_alt.match_reason})"
-            )
+            if not is_available:
+                # Lék není dostupný - doporuč alternativu
+                recommendation = (
+                    f"Tento přípravek není dostupný. "
+                    f"Doporučujeme alternativu: {top_alt.name} "
+                    f"(relevance: {top_alt.relevance_score:.0f}/100, "
+                    f"důvod: {top_alt.match_reason})"
+                )
+            else:
+                # Lék je dostupný - zobraz alternativy pro porovnání
+                recommendation = (
+                    f"Dostupných {len(alternatives)} alternativ. "
+                    f"Nejlepší: {top_alt.name} "
+                    f"(relevance: {top_alt.relevance_score:.0f}/100)"
+                )
         else:
             recommendation = "Tento přípravek není dostupný a nebyly nalezeny žádné alternativy."
 
@@ -1025,14 +1104,16 @@ async def get_atc_info(
     else:
         client = await get_sukl_client()
 
-    groups = await client.get_atc_groups(atc_code if len(atc_code) < 7 else None)
+    # For Level 5 (7 chars), search for exact match, not all groups
+    prefix = atc_code if len(atc_code) < 7 else None
+    groups = await client.get_atc_groups(prefix)
 
     # Najdi konkrétní skupinu
     target = None
     children = []
 
     for group in groups:
-        code = group.get("kod", group.get("KOD", ""))
+        code = group.get("ATC", group.get("atc", ""))
         if code == atc_code:
             target = group
         elif code.startswith(atc_code) and len(code) > len(atc_code):
@@ -1048,6 +1129,104 @@ async def get_atc_info(
         "level": len(atc_code) if len(atc_code) <= 5 else 5,
         "children": children[:20],
         "total_children": len(children),
+    }
+
+
+# === Background Tasks (Week 3: FastMCP Best Practices) ===
+
+
+@mcp.tool(
+    task=True,  # NEW: Background task
+    tags={"availability", "batch", "background"},
+    annotations={"readOnlyHint": True, "idempotentHint": True},
+    exclude_args=["progress", "ctx"],  # Exclude DI params from schema
+)
+async def batch_check_availability(
+    sukl_codes: list[str],
+    progress: Progress | None = None,
+    ctx: Context = CurrentContext(),
+) -> dict:
+    """
+    Zkontroluje dostupnost více léčiv najednou na pozadí.
+
+    Asynchronní batch operace pro kontrolu dostupnosti více léčiv současně.
+    Podporuje progress tracking a běží na pozadí s in-memory nebo Redis backend.
+
+    Args:
+        sukl_codes: Seznam SÚKL kódů k ověření (např. ["0123456", "0234567"])
+        progress: Progress tracker (automaticky injektován)
+        ctx: Context pro logging (automaticky injektován, optional)
+
+    Returns:
+        Souhrn výsledků s celkovými statistikami a detaily pro každý lék
+
+    Examples:
+        - batch_check_availability(["0123456", "0234567"])
+        - batch_check_availability(["0123456", "0234567", "0345678", ...])  # až 100 léků
+
+    Note:
+        - Development: Používá in-memory backend (výchozí)
+        - Production: Vyžaduje Redis/Valkey pro distributed mode
+        - Rate limiting: 0.1s mezi jednotlivými kontrolami
+    """
+    if not sukl_codes:
+        return {"error": "No SÚKL codes provided", "total": 0, "available": 0, "results": []}
+
+    # Limit maximum batch size
+    if len(sukl_codes) > 100:
+        await ctx.warning(f"Batch size {len(sukl_codes)} exceeds limit 100, truncating")
+        sukl_codes = sukl_codes[:100]
+
+    if progress:
+        await progress.set_total(len(sukl_codes))
+
+    await ctx.info(f"Starting batch availability check for {len(sukl_codes)} medicines")
+
+    results = []
+    available_count = 0
+
+    for i, code in enumerate(sukl_codes):
+        try:
+            await progress.set_message(f"Checking {code} ({i+1}/{len(sukl_codes)})")
+
+            # Call existing check_availability tool
+            result = await check_availability(code, include_alternatives=False)
+
+            is_available = result.is_available if result else False
+            if is_available:
+                available_count += 1
+
+            results.append({
+                "sukl_code": code,
+                "is_available": is_available,
+                "name": result.name if result else None,
+            })
+
+            if progress:
+                await progress.increment()
+
+            # Rate limiting to prevent overload
+            await asyncio.sleep(0.1)
+
+        except Exception as e:
+            logger.warning(f"Error checking availability for {code}: {e}")
+            results.append({
+                "sukl_code": code,
+                "is_available": False,
+                "error": str(e),
+            })
+            if progress:
+                await progress.increment()
+
+    await ctx.info(
+        f"Batch check complete: {available_count}/{len(sukl_codes)} medicines available"
+    )
+
+    return {
+        "total": len(sukl_codes),
+        "available": available_count,
+        "unavailable": len(sukl_codes) - available_count,
+        "results": results,
     }
 
 
@@ -1084,12 +1263,12 @@ async def get_top_level_atc_groups() -> dict:
     # Filtruj pouze top-level skupiny (1 znak) a přidej URI
     top_level = [
         {
-            "code": g.get("kod", g.get("KOD", "")),
+            "code": g.get("ATC", g.get("atc", "")),
             "name": g.get("nazev", g.get("NAZEV", "")),
-            "uri": f"sukl://atc/{g.get('kod', g.get('KOD', ''))}",  # Add navigation URI
+            "uri": f"sukl://atc/{g.get('ATC', g.get('atc', ''))}",  # Add navigation URI
         }
         for g in groups
-        if len(g.get("kod", g.get("KOD", ""))) == 1
+        if len(g.get("ATC", g.get("atc", ""))) == 1
     ]
 
     return {
@@ -1120,14 +1299,14 @@ async def get_atc_by_level(level: int) -> dict:
     code_lengths = {1: 1, 2: 3, 3: 4, 4: 5, 5: 7}
     target_length = code_lengths[level]
 
-    filtered = df[df["KOD"].str.len() == target_length]
+    filtered = df[df["ATC"].str.len() == target_length]
 
     return {
         "level": level,
         "total": len(filtered),
         "codes": [
             {
-                "code": row["KOD"],
+                "code": row["ATC"],
                 "name": row["NAZEV"],
                 "name_en": row.get("NAZEV_EN"),
             }
@@ -1151,7 +1330,7 @@ async def get_atc_code_resource(code: str) -> dict:
     df = client._loader.get_table("dlp_atc")
 
     # Get current code
-    current = df[df["KOD"] == code.upper()]
+    current = df[df["ATC"] == code.upper()]
     if current.empty:
         return {"error": f"ATC code {code} not found", "code": code}
 
@@ -1173,18 +1352,18 @@ async def get_atc_code_resource(code: str) -> dict:
     # Get children (1 level down)
     children = []
     if level < 5:  # Not at substance level
-        child_df = df[df["KOD"].str.startswith(code) & (df["KOD"].str.len() > code_len)]
+        child_df = df[df["ATC"].str.startswith(code) & (df["ATC"].str.len() > code_len)]
         # Group by next level length
         next_lengths = {1: 3, 3: 4, 4: 5, 5: 7}
         next_len = next_lengths.get(code_len)
         if next_len:
-            child_df = child_df[child_df["KOD"].str.len() == next_len]
+            child_df = child_df[child_df["ATC"].str.len() == next_len]
             children = [
-                {"code": c["KOD"], "name": c["NAZEV"]} for _, c in child_df.head(20).iterrows()
+                {"code": c["ATC"], "name": c["NAZEV"]} for _, c in child_df.head(20).iterrows()
             ]
 
     return {
-        "code": row["KOD"],
+        "code": row["ATC"],
         "name": row["NAZEV"],
         "name_en": row.get("NAZEV_EN"),
         "level": level,
@@ -1208,16 +1387,16 @@ async def get_atc_subtree(root_code: str) -> dict:
     df = client._loader.get_table("dlp_atc")
 
     # Get all codes starting with root_code
-    subtree = df[df["KOD"].str.startswith(root_code.upper())]
+    subtree = df[df["ATC"].str.startswith(root_code.upper())]
 
     return {
         "root_code": root_code.upper(),
         "total_descendants": len(subtree),
         "codes": [
             {
-                "code": row["KOD"],
+                "code": row["ATC"],
                 "name": row["NAZEV"],
-                "level": {1: 1, 3: 2, 4: 3, 5: 4, 7: 5}.get(len(row["KOD"]), 0),
+                "level": {1: 1, 3: 2, 4: 3, 5: 4, 7: 5}.get(len(row["ATC"]), 0),
             }
             for _, row in subtree.head(100).iterrows()
         ],
@@ -1336,11 +1515,11 @@ async def get_detailed_statistics() -> dict:
     atc_counts = {}
     if atc_df is not None:
         atc_counts = {
-            "level_1": len(atc_df[atc_df["KOD"].str.len() == 1]),
-            "level_2": len(atc_df[atc_df["KOD"].str.len() == 3]),
-            "level_3": len(atc_df[atc_df["KOD"].str.len() == 4]),
-            "level_4": len(atc_df[atc_df["KOD"].str.len() == 5]),
-            "level_5": len(atc_df[atc_df["KOD"].str.len() == 7]),
+            "level_1": len(atc_df[atc_df["ATC"].str.len() == 1]),
+            "level_2": len(atc_df[atc_df["ATC"].str.len() == 3]),
+            "level_3": len(atc_df[atc_df["ATC"].str.len() == 4]),
+            "level_4": len(atc_df[atc_df["ATC"].str.len() == 5]),
+            "level_5": len(atc_df[atc_df["ATC"].str.len() == 7]),
         }
 
     # Pharmacies
@@ -1359,6 +1538,50 @@ async def get_detailed_statistics() -> dict:
         "data_source": "SÚKL Open Data",
         "server_version": "4.1.0",
         "last_update": "2024-12-23",
+    }
+
+
+@mcp.resource("sukl://documents/{sukl_code}/availability")
+async def get_document_availability(sukl_code: str) -> dict:
+    """
+    Lehká kontrola dostupnosti dokumentů (PIL/SPC) pro daný lék.
+
+    Vrací informace o dostupnosti Příbalové informace (PIL) a Souhrnu
+    údajů o přípravku (SPC) bez stahování a parsování dokumentů.
+
+    Args:
+        sukl_code: SÚKL kód léčivého přípravku (např. "0123456")
+
+    Returns:
+        Informace o dostupnosti PIL a SPC dokumentů s URL
+
+    Examples:
+        - sukl://documents/0123456/availability
+        - sukl://documents/0234567/availability
+
+    Note:
+        - Lightweight check - nekontroluje skutečnou existenci souborů
+        - Pro stažení obsahu použijte nástroje get_pil_content nebo get_spc_content
+        - URL jsou standardizované podle SÚKL formátu
+    """
+    # Standardizované URL podle SÚKL konvence
+    base_url = "https://prehledy.sukl.cz"
+
+    return {
+        "sukl_code": sukl_code,
+        "pil": {
+            "url": f"{base_url}/pil/{sukl_code}.pdf",
+            "type": "Příbalová informace (PIL)",
+            "format": "pdf",
+            "description": "Informace pro pacienty v českém jazyce",
+        },
+        "spc": {
+            "url": f"{base_url}/spc/{sukl_code}.pdf",
+            "type": "Souhrn údajů o přípravku (SPC)",
+            "format": "pdf",
+            "description": "Odborné informace pro zdravotnické pracovníky",
+        },
+        "note": "Pro stažení a parsování obsahu použijte get_pil_content nebo get_spc_content",
     }
 
 
