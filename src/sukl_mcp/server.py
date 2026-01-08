@@ -259,8 +259,8 @@ async def _try_rest_search(
         )
 
         if not search_result.codes:
-            logger.info(f"REST API: žádné výsledky pro '{query}'")
-            return [], "rest_api"
+            logger.info(f"REST API: žádné výsledky pro '{query}' - falling back to CSV")
+            return None  # Force CSV fallback when REST API returns no results
 
         # Batch fetch details
         medicines = await api_client.get_medicines_batch(
@@ -1104,7 +1104,9 @@ async def get_atc_info(
     else:
         client = await get_sukl_client()
 
-    groups = await client.get_atc_groups(atc_code if len(atc_code) < 7 else None)
+    # For Level 5 (7 chars), search for exact match, not all groups
+    prefix = atc_code if len(atc_code) < 7 else None
+    groups = await client.get_atc_groups(prefix)
 
     # Najdi konkrétní skupinu
     target = None
@@ -1141,7 +1143,7 @@ async def get_atc_info(
 )
 async def batch_check_availability(
     sukl_codes: list[str],
-    progress: Progress = Progress(),
+    progress: Progress | None = None,
     ctx: Context = CurrentContext(),
 ) -> dict:
     """
@@ -1175,7 +1177,8 @@ async def batch_check_availability(
         await ctx.warning(f"Batch size {len(sukl_codes)} exceeds limit 100, truncating")
         sukl_codes = sukl_codes[:100]
 
-    await progress.set_total(len(sukl_codes))
+    if progress:
+        await progress.set_total(len(sukl_codes))
 
     await ctx.info(f"Starting batch availability check for {len(sukl_codes)} medicines")
 
@@ -1199,7 +1202,8 @@ async def batch_check_availability(
                 "name": result.name if result else None,
             })
 
-            await progress.increment()
+            if progress:
+                await progress.increment()
 
             # Rate limiting to prevent overload
             await asyncio.sleep(0.1)
@@ -1211,7 +1215,8 @@ async def batch_check_availability(
                 "is_available": False,
                 "error": str(e),
             })
-            await progress.increment()
+            if progress:
+                await progress.increment()
 
     await ctx.info(
         f"Batch check complete: {available_count}/{len(sukl_codes)} medicines available"
