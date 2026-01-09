@@ -11,6 +11,7 @@ from typing import Any, Literal
 
 import docx
 import httpx
+import pandas as pd
 import pypdf
 from async_lru import alru_cache
 
@@ -277,7 +278,7 @@ class DocumentParser:
             SUKLParseError: Když parsing selže
         """
         # Získej filename z CSV dlp_nazvydokumentu.csv
-        df_docs = self._loader.get_table("dlp_nazvydokumentu")
+        df_docs = self.loader.get_table("dlp_nazvydokumentu")
         if df_docs is None or df_docs.empty:
             logger.warning(f"dllp_nazvydokumentu.csv not available, using default URL pattern")
             filename = f"{sukl_code}.pdf"
