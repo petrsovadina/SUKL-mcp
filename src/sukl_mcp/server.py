@@ -15,7 +15,7 @@ from typing import Annotated, Literal, Optional
 import httpx
 from rapidfuzz import fuzz
 from fastmcp import Context, FastMCP
-from fastmcp.dependencies import Progress, CurrentContext
+from fastmcp.dependencies import Depends, Progress, CurrentContext
 
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
@@ -1317,13 +1317,8 @@ async def get_atc_info(
 
     if len(atc_code) == 7:
         # Level 5: Direct lookup - hledáme konkrétní kód v celém datasetu
-        all_groups = await client.get_atc_groups(atc_prefix=None)  # Všechny řádky
-        target = None
-        for group in all_groups:
-            code = group.get("ATC", group.get("atc", ""))
-            if code == atc_code:
-                target = group
-                break
+        groups = await client.get_atc_groups(atc_prefix=atc_code)
+        target = groups[0] if groups else None
 
         return {
             "code": atc_code,
@@ -1376,7 +1371,7 @@ async def get_atc_info(
 async def batch_check_availability(
     sukl_codes: list[str],
     ctx: Annotated[Context, CurrentContext] = None,
-    progress: Progress | None = None,
+    progress: Progress = Depends(Progress),
 ) -> dict:
     """
     Zkontroluje dostupnost více léčiv najednou na pozadí.
