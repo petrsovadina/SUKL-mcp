@@ -11,7 +11,7 @@ import re
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import httpx
 import pandas as pd

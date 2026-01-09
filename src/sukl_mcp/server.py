@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 from rapidfuzz import fuzz
 from fastmcp import Context, FastMCP
@@ -1033,122 +1033,6 @@ async def check_availability(
         recommendation=recommendation,
         checked_at=datetime.now(),
     )
-
-
-@mcp.tool(
-    tags={"pricing", "reimbursement"},
-    annotations={"readOnlyHint": True, "idempotentHint": True},
-)
-async def get_reimbursement(
-    sukl_code: str,
-    ctx: Context | None = None,
-) -> ReimbursementInfo | None:
-    """
-    Získá informace o úhradě léčivého přípravku zdravotní pojišťovnou.
-
-    Vrací maximální cenu, výši úhrady pojišťovny a doplatek pacienta
-    podle aktuálních cenových předpisů SÚKL (dlp_cau.csv).
-
-    POZNÁMKA: Skutečný doplatek se může lišit podle konkrétní pojišťovny
-    a bonusových programů lékáren.
-
-     OPRAVA v4.0: Cenová data JSOU v REST API, ne jen v CSV!
-     - Dataset DLPO (léčiva) = CSV ✅
-     - Dataset SCAU (ceny & úhrady) = REST API ✅
-
-     v4.0: PURE REST API pro CAU-SCAU endpoint
-     - Primary: REST API /dlp/v1/cau-scau/{kodSUKL}
-     - Fallback: CSV dlp_cau.csv (pokud REST API selže)
-
-     REST API endpoint vrací:
-     - maxCenaLekarna: Maximální cena v lékárně (např. 162.82 Kč)
-     - cenaPuvodce: Cena výrobce (např. 106.11 Kč)
-     - uhrada: Úhrada pojišťovnou (např. 79.76 Kč)
-     - zapocitatelnyDoplatek: Započitatelný doplatek (např. 83.06 Kč)
-
-     Args:
-         sukl_code: SÚKL kód přípravku (7 číslic, např. "0012345")
-
-     Returns:
-         ReimbursementInfo s cenovými a úhradovými informacemi nebo None
-
-     Examples:
-         - get_reimbursement("0094156")  # ABAKTAL
-         → max_price: 162.82, patient_copay: 83.06, reimbursement_amount: 79.76
-    """
-    sukl_code = sukl_code.strip().zfill(7)
-
-    # Context-aware logging
-    if ctx:
-        await ctx.info(f"Fetching reimbursement info for medicine: {sukl_code}")
-
-    # OPTIONAL: REST API pro název léčiva (rychlejší než CSV)
-    medicine_name = ""
-    try:
-        if ctx:
-            app_ctx = ctx.request_context.lifespan_context
-            api_client = app_ctx.api_client
-        else:
-            api_client = await get_api_client()
-
-        medicine = await api_client.get_medicine(sukl_code)
-        if medicine:
-            medicine_name = medicine.nazev
-            logger.info(f"✅ REST API: medicine name for {sukl_code}")
-            if ctx:
-                await ctx.debug("Retrieved medicine name via REST API")
-    except (SUKLAPIError, Exception) as e:
-        logger.debug(f"REST API name fetch failed: {e}, using CSV")
-        if ctx:
-            await ctx.debug("REST API failed, will use CSV for medicine name")
-        pass  # Fallback na CSV název
-
-    # ALWAYS: Získej základní informace a cenové údaje z CSV
-    if ctx:
-        app_ctx = ctx.request_context.lifespan_context
-        csv_client = app_ctx.client
-    else:
-        csv_client = await get_sukl_client()
-
-    if not medicine_name:
-        detail = await csv_client.get_medicine_detail(sukl_code)
-        if not detail:
-            return None
-        medicine_name = detail.get("NAZEV", "")
-
-    # ALWAYS: Cenové a úhradové informace z dlp_cau (REST API je nemá)
-    price_info = await csv_client.get_price_info(sukl_code)
-
-    # Sestavení response
-    if price_info:
-        return ReimbursementInfo(
-            sukl_code=sukl_code,
-            medicine_name=medicine_name,
-            is_reimbursed=price_info.get("is_reimbursed", False),
-            reimbursement_group=price_info.get("indication_group"),
-            max_producer_price=price_info.get("max_price"),
-            max_retail_price=price_info.get("max_price"),  # Stejná hodnota jako max_producer_price
-            reimbursement_amount=price_info.get("reimbursement_amount"),
-            patient_copay=price_info.get("patient_copay"),
-            has_indication_limit=bool(price_info.get("indication_group")),
-            indication_limit_text=price_info.get("indication_group"),
-            specialist_only=False,  # Data není v dlp_cau.csv
-        )
-    else:
-        # Fallback pokud nejsou cenová data
-        return ReimbursementInfo(
-            sukl_code=sukl_code,
-            medicine_name=medicine_name,
-            is_reimbursed=False,
-            reimbursement_group=None,
-            max_producer_price=None,
-            max_retail_price=None,
-            reimbursement_amount=None,
-            patient_copay=None,
-            has_indication_limit=False,
-            indication_limit_text=None,
-            specialist_only=False,
-        )
 
 
 @mcp.tool(
