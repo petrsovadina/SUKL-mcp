@@ -45,25 +45,65 @@ def _get_pharmacy_url() -> str:
 
 
 def _get_cache_dir() -> Path:
-    """Get cache directory from ENV or default."""
-    return Path(os.getenv("SUKL_CACHE_DIR", "/tmp/sukl_dlp_cache"))
+    """Get cache directory from ENV or default.
+
+    Priority order (container-friendly):
+    1. Environment variable SUKL_CACHE_DIR
+    2. /tmp/sukl_dlp_cache (writeable in containers)
+    3. Local cache/ (development)
+    """
+    # 1. Priority: Environment variable
+    env_dir = os.getenv("SUKL_CACHE_DIR")
+    if env_dir:
+        return Path(env_dir)
+
+    # 2. Priority: /tmp (kontejner-friendly)
+    tmp_cache = Path("/tmp/sukl_dlp_cache")
+    # Pokud jsme v kontejneru (Path.cwd() není writeable), preferujeme /tmp
+    if tmp_cache.exists() or not os.access(os.getcwd(), os.W_OK):
+        return tmp_cache
+
+    # 3. Priority: Lokální cache/
+    cwd_cache = Path.cwd() / "cache"
+    if cwd_cache.exists():
+        return cwd_cache
+
+    # Fallback: Vždy /tmp
+    return Path("/tmp/sukl_dlp_cache")
 
 
 def _get_data_dir() -> Path:
-    """Get data directory from ENV or default."""
+    """Get data directory from ENV or default.
+
+    Priority order (container-friendly):
+    1. Environment variable SUKL_DATA_DIR
+    2. /tmp/sukl_dlp_data (writeable in containers)
+    3. Local data/ directory (development only)
+    4. Project data/ directory (development only)
+    """
+    # 1. Priority: Environment variable
     env_dir = os.getenv("SUKL_DATA_DIR")
     if env_dir:
         return Path(env_dir)
 
+    # 2. Priority: /tmp (kontejner-friendly)
+    tmp_data = Path("/tmp/sukl_dlp_data")
+    # Pokud jsme v kontejneru (Path.cwd() není writeable), preferujeme /tmp
+    if tmp_data.exists() or not os.access(os.getcwd(), os.W_OK):
+        return tmp_data
+
+    # 3. Priority: Lokální data/ (development)
     cwd_data = Path.cwd() / "data"
     if cwd_data.exists() and (cwd_data / "dlp_lecivepripravky.csv").exists():
         return cwd_data
 
+    # 4. Priority: Project data/ (development)
     base_dir = Path(__file__).parent.parent.parent
     default_dir = base_dir / "data"
     if default_dir.exists() and (default_dir / "dlp_lecivepripravky.csv").exists():
         return default_dir
 
+    # Fallback: Vždy /tmp pro kontejnery
     return Path("/tmp/sukl_dlp_data")
 
 
