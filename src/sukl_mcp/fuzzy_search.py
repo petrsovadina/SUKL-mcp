@@ -372,6 +372,9 @@ class FuzzyMatcher:
         if not query or len(query) < 1:
             return []
 
+        if "ATC_WHO" not in df_medicines.columns:
+            return []
+
         mask = df_medicines["ATC_WHO"].str.startswith(query.upper(), na=False)
         results_df = df_medicines[mask]
 
