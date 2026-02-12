@@ -1,104 +1,34 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.pyc
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual environments
-venv/
-ENV/
-env/
-.venv/
-.virtualenv/
-
-# Testing
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-.tox/
-.nox/
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-nosetests.xml
-test-results/
-
-# Test artifacts & temporary files
-test_production_server.py
-
-# Type checking & linting
-.mypy_cache/
-.ruff_cache/
-.pytype/
-.dmypy.json
-dmypy.json
-
-# SÚKL data cache
-/tmp/sukl_dlp_cache/
-/tmp/sukl_dlp_data/
-data/  # CSV files downloaded at runtime from SÚKL Open Data
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-*_2
-*_3
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.project
-.pydevproject
-.settings/
-
-# Jupyter Notebook
-.ipynb_checkpoints
+# Node.js
+node_modules/
+.next/
+out/
 
 # Environment variables
 .env
 .env.local
 .env.*.local
 
-# Logs
-*.log
-logs/
+# Vercel
+.vercel
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
+# Legacy Python project
+legacy/venv/
+legacy/data/
+legacy/__pycache__/
+*.pyc
+venv/
 
 # Claude local settings
 .claude/
 
-# Legacy AI configs
-.serena/
+# macOS
+.DS_Store
 
-# Python version manager
-.python-version
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
