@@ -15,11 +15,12 @@
 
 SUKL MCP Server implementuje [Model Context Protocol](https://modelcontextprotocol.io/) a poskytuje AI agentům (Claude, GPT-4, atd.) přístup k databázi **68 000+ léčivých přípravků** registrovaných v České republice.
 
-### Hlavni funkce
+### Hlavní funkce
 
 - **9 MCP tools** pro komplexní práci s farmaceutickými daty
 - **Fuzzy vyhledávání** pomocí Fuse.js s tolerancí překlepů
-- **Landing page** s informacemi o projektu a interaktivním demo chatem
+- **Landing page** s informacemi o projektu a interaktivním demo
+- **Guided demo onboarding** — 3-krokový interaktivní tour (hledání → detail → ATC)
 - **MCP Streamable HTTP** endpoint (JSON-RPC 2.0) na `/mcp`
 - **Demo chat** bez LLM — regex/pattern matching pro ukázku tool calls
 - **Dark/Light mode** s plně responzivním designem
@@ -117,7 +118,7 @@ SUKL-mcp/
 │   │       └── demo/route.ts     # Demo chat backend (rate limited)
 │   ├── components/
 │   │   ├── sections/             # 12 landing page sekcí (vč. demo)
-│   │   ├── demo/                 # Chat widget (4 komponenty)
+│   │   ├── demo/                 # Guided tour + chat widget (10 komponent)
 │   │   ├── ui/                   # 11 UI komponent
 │   │   └── theme-provider.tsx    # next-themes provider
 │   └── lib/
