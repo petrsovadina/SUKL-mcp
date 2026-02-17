@@ -220,6 +220,21 @@ function validateString(value: unknown, name: string): string {
   return value.trim();
 }
 
+function validateArray(value: unknown, name: string, maxItems: number): string[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`Parametr '${name}' musí být neprázdné pole řetězců.`);
+  }
+  if (value.length > maxItems) {
+    throw new Error(`Maximální počet položek v '${name}' je ${maxItems}.`);
+  }
+  return value.map((item, i) => {
+    if (typeof item !== "string" || item.trim().length === 0) {
+      throw new Error(`Položka ${i + 1} v '${name}' musí být neprázdný řetězec.`);
+    }
+    return item.trim();
+  });
+}
+
 function validateNumber(value: unknown, fallback: number, min: number, max: number): number {
   if (value === undefined || value === null) return fallback;
   const n = typeof value === "number" ? value : Number(value);
@@ -231,43 +246,47 @@ async function executeTool(
   name: string,
   args: Record<string, unknown>
 ): Promise<{ content: { type: string; text: string }[] }> {
+  const startTime = performance.now();
   try {
     let result: unknown;
 
     switch (name) {
       case "search-medicine": {
         const query = validateString(args.query, "query");
+        if (query.length > 200) {
+          throw new Error("Vyhledávací dotaz nesmí překročit 200 znaků.");
+        }
         const limit = validateNumber(args.limit, 20, 1, 100);
         result = await searchMedicines(query, limit);
         break;
       }
       case "get-medicine-details": {
-        const code = args.sukl_code as string;
+        const code = validateString(args.sukl_code, "sukl_code");
         result = await getMedicineByCode(code);
         if (!result) {
-          return {
+          return logAndReturn(name, args, startTime, "ok", {
             content: [
               {
                 type: "text",
                 text: `Lék s SÚKL kódem '${code}' nebyl nalezen.`,
               },
             ],
-          };
+          });
         }
         break;
       }
       case "check-availability": {
-        const code = args.sukl_code as string;
+        const code = validateString(args.sukl_code, "sukl_code");
         result = await checkAvailability(code);
         if (!result) {
-          return {
+          return logAndReturn(name, args, startTime, "ok", {
             content: [
               {
                 type: "text",
                 text: `Lék s SÚKL kódem '${code}' nebyl nalezen.`,
               },
             ],
-          };
+          });
         }
         break;
       }
@@ -280,20 +299,20 @@ async function executeTool(
         break;
       }
       case "get-atc-info": {
-        const atcCode = args.atc_code as string;
+        const atcCode = validateString(args.atc_code, "atc_code");
         const includeMedicines = (args.include_medicines as boolean) || false;
         const medicinesLimit = (args.medicines_limit as number) || 20;
 
         const atcInfo = await getATCInfo(atcCode);
         if (!atcInfo) {
-          return {
+          return logAndReturn(name, args, startTime, "ok", {
             content: [
               {
                 type: "text",
                 text: `ATC kód '${atcCode}' nebyl nalezen.`,
               },
             ],
-          };
+          });
         }
 
         if (includeMedicines) {
@@ -309,60 +328,59 @@ async function executeTool(
         break;
       }
       case "get-reimbursement": {
-        const code = args.sukl_code as string;
+        const code = validateString(args.sukl_code, "sukl_code");
         result = await getReimbursement(code);
         if (!result) {
-          return {
+          return logAndReturn(name, args, startTime, "ok", {
             content: [
               {
                 type: "text",
                 text: `Informace o úhradě pro SÚKL kód '${code}' nejsou k dispozici.`,
               },
             ],
-          };
+          });
         }
         break;
       }
       case "get-pil-content": {
-        const code = args.sukl_code as string;
+        const code = validateString(args.sukl_code, "sukl_code");
         result = await getDocumentContent(code, "PIL");
         if (!result) {
-          return {
+          return logAndReturn(name, args, startTime, "ok", {
             content: [
               {
                 type: "text",
                 text: `Příbalový leták pro SÚKL kód '${code}' nebyl nalezen.`,
               },
             ],
-          };
+          });
         }
         break;
       }
       case "get-spc-content": {
-        const code = args.sukl_code as string;
+        const code = validateString(args.sukl_code, "sukl_code");
         result = await getDocumentContent(code, "SPC");
         if (!result) {
-          return {
+          return logAndReturn(name, args, startTime, "ok", {
             content: [
               {
                 type: "text",
                 text: `SPC pro SÚKL kód '${code}' nebylo nalezeno.`,
               },
             ],
-          };
+          });
         }
         break;
       }
       case "batch-check-availability": {
-        const codes = args.sukl_codes as string[];
-        const limited = codes.slice(0, 50);
+        const codes = validateArray(args.sukl_codes, "sukl_codes", 50);
         const results = await Promise.all(
-          limited.map((code) => checkAvailability(code))
+          codes.map((code) => checkAvailability(code))
         );
         const validResults = results.filter(Boolean);
         result = {
           results: validResults,
-          total_checked: limited.length,
+          total_checked: codes.length,
           available_count: validResults.filter(
             (r) => r?.status === "available"
           ).length,
@@ -374,36 +392,67 @@ async function executeTool(
         break;
       }
       default:
-        return {
+        return logAndReturn(name, args, startTime, "ok", {
           content: [
             { type: "text", text: `Neznámý nástroj: '${name}'` },
           ],
-        };
+        });
     }
 
-    return {
+    return logAndReturn(name, args, startTime, "ok", {
       content: [
         {
           type: "text",
           text: JSON.stringify(result, null, 2),
         },
       ],
-    };
+    });
   } catch (error) {
-    // Log full error server-side, return safe message to client
-    console.error(`MCP tool error [${name}]:`, error);
-    const isValidation = error instanceof Error && error.message.startsWith("Parametr");
+    const duration_ms = Math.round(performance.now() - startTime);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(JSON.stringify({
+      event: "mcp_tool_call",
+      tool: name,
+      params: args,
+      duration_ms,
+      status: "error",
+      error: errorMessage,
+    }));
+    const isValidation = error instanceof Error && (
+      errorMessage.startsWith("Parametr") ||
+      errorMessage.startsWith("Vyhledávací") ||
+      errorMessage.startsWith("Maximální") ||
+      errorMessage.startsWith("Položka")
+    );
     return {
       content: [
         {
           type: "text",
           text: isValidation
-            ? (error as Error).message
+            ? errorMessage
             : "Chyba při zpracování požadavku. Zkuste to znovu.",
         },
       ],
     };
   }
+}
+
+function logAndReturn(
+  tool: string,
+  params: Record<string, unknown>,
+  startTime: number,
+  status: "ok" | "error",
+  response: { content: { type: string; text: string }[] },
+): { content: { type: string; text: string }[] } {
+  const duration_ms = Math.round(performance.now() - startTime);
+  console.log(JSON.stringify({
+    event: "mcp_tool_call",
+    tool,
+    params,
+    duration_ms,
+    status,
+  }));
+  return response;
 }
 
 // ============================================================================
