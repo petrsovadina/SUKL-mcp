@@ -60,12 +60,35 @@ interface BundledATC {
   p: string;  // parent
 }
 
+interface BundledPharmacy {
+  n: string;   // name (NAZEV)
+  k: string;   // workplace code (KOD_PRACOVISTE)
+  a: string;   // address (ULICE)
+  c: string;   // city (MESTO)
+  z: string;   // postal code (PSC)
+  t: string;   // phone (TELEFON)
+  e: string;   // email (EMAIL)
+  w: string;   // web (WWW)
+  r: boolean;  // has eRecept (ERP)
+  h: boolean;  // is 24h emergency (POHOTOVOST)
+}
+
+interface BundledReimbursement {
+  c: string;        // sukl_code
+  g: string | null;  // reimbursement_group
+  m: number | null;  // max_price
+  a: number | null;  // reimbursement_amount
+  s: number | null;  // patient_surcharge
+}
+
 interface BundledData {
   m: BundledMedicine[];
   a: BundledATC[];
+  p?: BundledPharmacy[];
+  r?: BundledReimbursement[];
   _: {
     t: string;
-    c: { m: number; a: number };
+    c: { m: number; a: number; p?: number; r?: number };
   };
 }
 
@@ -138,6 +161,37 @@ function transformBundledMedicine(m: BundledMedicine): MedicineDetail {
   };
 }
 
+function transformBundledPharmacy(p: BundledPharmacy): Pharmacy {
+  return {
+    id: p.k,
+    name: p.n,
+    address: p.a,
+    city: p.c,
+    postal_code: p.z,
+    phone: p.t || null,
+    email: p.e || null,
+    opening_hours: null,
+    latitude: null,
+    longitude: null,
+    distance_km: null,
+    is_24h: p.h,
+    has_erecept: p.r,
+  };
+}
+
+function transformBundledReimbursement(r: BundledReimbursement): ReimbursementInfo {
+  return {
+    sukl_code: r.c,
+    reimbursement_group: r.g,
+    max_price: r.m,
+    reimbursement_amount: r.a,
+    patient_surcharge: r.s,
+    reimbursement_conditions: null,
+    valid_from: null,
+    valid_until: null,
+  };
+}
+
 function transformBundledATC(a: BundledATC): ATCInfo {
   return {
     code: a.c,
@@ -171,9 +225,23 @@ export async function initializeData(): Promise<void> {
     store.atcCodes.set(info.code, info);
   }
 
+  // Transform pharmacies (if available)
+  if (data.p) {
+    store.pharmacies = data.p.map(transformBundledPharmacy);
+  }
+
+  // Transform reimbursements (if available)
+  if (data.r) {
+    store.reimbursements.clear();
+    for (const r of data.r) {
+      const info = transformBundledReimbursement(r);
+      store.reimbursements.set(info.sukl_code, info);
+    }
+  }
+
   store.lastLoaded = new Date();
   console.log(
-    `Loaded ${store.medicines.length} medicines, ${store.atcCodes.size} ATC codes from bundle`
+    `Loaded ${store.medicines.length} medicines, ${store.atcCodes.size} ATC codes, ${store.pharmacies.length} pharmacies, ${store.reimbursements.size} reimbursements from bundle`
   );
 }
 

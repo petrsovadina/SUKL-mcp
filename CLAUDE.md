@@ -73,12 +73,17 @@ The demo section uses a state machine orchestrator pattern:
 
 - **Platform:** Vercel, region `fra1` (Frankfurt)
 - **Config:** `vercel.json` — rewrites `/mcp` to `/api/mcp`, CORS headers for MCP endpoint
-- **`bundled-data.json` must be committed** — needed at build time and runtime on Vercel
+- **`bundled-data.json` must be committed** — needed at build time and runtime on Vercel (10.4 MB with medicines, pharmacies, reimbursements)
 
 ## Known Constraints
 
-- Pharmacy data not in bundled JSON — `find-pharmacies` returns empty results
 - PIL/SPC document content not implemented — returns placeholder text
-- Reimbursement data not in bundled JSON — `get-reimbursement` returns null
 - In-memory rate limiting resets on serverless cold start
-- Cold start may be slow due to 9.5 MB JSON lazy-loading
+- Cold start may be slow due to 10.4 MB JSON lazy-loading
+
+## Active Technologies
+- TypeScript 5+ / Next.js 16.1.6 / React 19.2.3 + Fuse.js 7.1 (fuzzy search), framer-motion 12, Radix UI, lucide-react, clsx + tailwind-merge (001-production-ready)
+- `data/bundled-data.json` (9.5 MB, committed, lazy-loaded via `fs.readFileSync`) (001-production-ready)
+
+## Recent Changes
+- 001-production-ready: Added TypeScript 5+ / Next.js 16.1.6 / React 19.2.3 + Fuse.js 7.1 (fuzzy search), framer-motion 12, Radix UI, lucide-react, clsx + tailwind-merge

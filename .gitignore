@@ -24,6 +24,10 @@ venv/
 # macOS
 .DS_Store
 
+# iCloud
+*.icloud
+.icloud
+
 # IDE
 .vscode/
 .idea/
