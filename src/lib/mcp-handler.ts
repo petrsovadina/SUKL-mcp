@@ -153,7 +153,7 @@ const TOOLS = [
   {
     name: "get-pil-content",
     description:
-      "Příbalový leták (PIL) léčivého přípravku. Obsahuje informace pro pacienty o užívání, dávkování, nežádoucích účincích a kontraindikacích.",
+      "Příbalový leták (PIL) léčivého přípravku. Vrací metadata a URL ke stažení PDF dokumentu ze SÚKL. Pro parsování obsahu PDF doporučujeme docling-mcp server.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -168,7 +168,7 @@ const TOOLS = [
   {
     name: "get-spc-content",
     description:
-      "Souhrn údajů o přípravku (SPC/SmPC). Odborný dokument pro zdravotnické pracovníky s farmakologickými vlastnostmi a klinickými údaji.",
+      "Souhrn údajů o přípravku (SPC/SmPC). Vrací metadata a URL ke stažení PDF dokumentu ze SÚKL. Pro parsování obsahu PDF doporučujeme docling-mcp server.",
     inputSchema: {
       type: "object" as const,
       properties: {
