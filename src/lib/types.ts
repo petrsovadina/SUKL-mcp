@@ -75,4 +75,5 @@ export interface DocumentContent {
   sections: { heading: string; content: string }[];
   last_updated: string | null;
   language: string;
+  document_url: string | null;
 }
