@@ -347,6 +347,14 @@ export async function checkAvailability(
   };
 }
 
+const SUKL_API_BASE = "https://prehledy.sukl.cz/dlp/v1";
+
+interface SuklDocumentMeta {
+  id: number;
+  typ: string;
+  nazev: string;
+}
+
 export async function getDocumentContent(
   suklCode: string,
   documentType: "PIL" | "SPC"
@@ -354,15 +362,66 @@ export async function getDocumentContent(
   const medicine = await getMedicineByCode(suklCode);
   if (!medicine) return null;
 
-  return {
-    sukl_code: suklCode,
-    document_type: documentType,
-    title: `${documentType} - ${medicine.name}`,
-    content: `Document content for ${medicine.name} is not yet available. Implementation pending.`,
-    sections: [],
-    last_updated: null,
-    language: "cs",
-  };
+  try {
+    const res = await fetch(
+      `${SUKL_API_BASE}/dokumenty-metadata/${suklCode}`
+    );
+
+    if (!res.ok) {
+      return {
+        sukl_code: suklCode,
+        document_type: documentType,
+        title: `${documentType} - ${medicine.name}`,
+        content: `Dokumenty pro ${medicine.name} nejsou v SÚKL API k dispozici (HTTP ${res.status}).`,
+        sections: [],
+        last_updated: null,
+        language: "cs",
+        document_url: null,
+      };
+    }
+
+    const docs: SuklDocumentMeta[] = await res.json();
+    const doc = docs.find(
+      (d) => d.typ.toUpperCase() === documentType
+    );
+
+    if (!doc) {
+      return {
+        sukl_code: suklCode,
+        document_type: documentType,
+        title: `${documentType} - ${medicine.name}`,
+        content: `Dokument ${documentType} pro ${medicine.name} není k dispozici.`,
+        sections: [],
+        last_updated: null,
+        language: "cs",
+        document_url: null,
+      };
+    }
+
+    const downloadUrl = `${SUKL_API_BASE}/dokumenty/${doc.id}`;
+
+    return {
+      sukl_code: suklCode,
+      document_type: documentType,
+      title: `${documentType} - ${medicine.name}`,
+      content: `Dokument ${documentType} pro přípravek ${medicine.name} je dostupný ke stažení. Pro zpracování obsahu PDF doporučujeme použít docling-mcp server.`,
+      sections: [],
+      last_updated: null,
+      language: "cs",
+      document_url: downloadUrl,
+    };
+  } catch {
+    return {
+      sukl_code: suklCode,
+      document_type: documentType,
+      title: `${documentType} - ${medicine.name}`,
+      content: `Nepodařilo se získat dokument z SÚKL API.`,
+      sections: [],
+      last_updated: null,
+      language: "cs",
+      document_url: null,
+    };
+  }
 }
 
 export async function findPharmacies(
