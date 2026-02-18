@@ -16,9 +16,12 @@ npm install       # Install dependencies
 npm run dev       # Dev server (http://localhost:3000)
 npm run build     # Production build (also runs TypeScript check)
 npm start         # Start production server
+npm test          # Run Vitest tests
+npm run test:watch # Vitest watch mode
+npm run analyze   # Bundle size analysis (opens browser)
 ```
 
-No test runner is configured. Verify changes with `npm run build` (catches TypeScript errors).
+Tests: `npm test` runs Vitest (28 tests: unit + integration). Config in `vitest.config.ts`.
 
 ## Architecture
 
@@ -77,6 +80,6 @@ The demo section uses a state machine orchestrator pattern:
 
 ## Known Constraints
 
-- PIL/SPC document content not implemented — returns placeholder text
+- PIL/SPC returns download URL from SÚKL API (prehledy.sukl.cz) — PDF parsing via docling-mcp companion
 - In-memory rate limiting resets on serverless cold start
 - Cold start may be slow due to 10.4 MB JSON lazy-loading
