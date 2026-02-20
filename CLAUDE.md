@@ -36,7 +36,7 @@ Tests: `npm test` runs Vitest (28 tests: unit + integration). Config in `vitest.
 ### Data flow
 
 ```
-bundled-data.json (9.5 MB, committed)
+bundled-data.json (10.4 MB, committed)
         ↓ fs.readFileSync (lazy, cached in memory)
     sukl-client.ts (Fuse.js fuzzy search index)
        ↙        ↘

@@ -1,5 +1,7 @@
 # Epic 2: Advanced Features — Implementation Plan
 
+> **ARCHIV — DOKONČEN** (PR #36, merged). Aktuální stav viz `2026-02-20-roadmap-status.md`.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Vitest test suite, PIL/SPC on-demand z SÚKL API, GitHub Action pro měsíční aktualizaci dat, bundle optimalizace.

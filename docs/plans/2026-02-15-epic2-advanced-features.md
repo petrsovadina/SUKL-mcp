@@ -1,5 +1,7 @@
 # EPIC 2: Advanced Features — Implementation Plan
 
+> **ARCHIV — NAHRAZEN** novým plánem `2026-02-18-epic2-implementation-plan.md` (PR #36). Tento dokument byl první verze, která plánovala PDF parsing lokálně. Finální implementace používá SÚKL REST API.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** PIL/SPC dokumenty z reálných SÚKL dat, automatizovaná data pipeline, test suite a performance optimalizace.

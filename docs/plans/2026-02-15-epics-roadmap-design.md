@@ -1,5 +1,7 @@
 # SÚKL MCP — Roadmap Design
 
+> **ARCHIV** — Oba epicy dokončeny. Aktuální stav viz `2026-02-20-roadmap-status.md`.
+
 > **Datum:** 2026-02-15
 > **Přístup:** Hybridní (2 Epicy)
 > **Strategie:** Systematicky, ASAP, minimalizace rizik

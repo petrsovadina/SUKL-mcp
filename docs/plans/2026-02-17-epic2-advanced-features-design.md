@@ -1,7 +1,9 @@
 # Epic 2: Advanced Features — Design
 
+> **ARCHIV — DOKONČEN** (PR #36, merged). Aktuální stav viz `2026-02-20-roadmap-status.md`.
+
 **Date:** 2026-02-17
-**Status:** Approved
+**Status:** Implemented
 **Prerekvizity:** Epic 1 (PR #35, merged)
 
 ## Goal
