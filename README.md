@@ -133,10 +133,15 @@ SUKL-mcp/
 │       ├── demo-handler.ts       # Intent parser (regex)
 │       └── utils.ts              # cn() helper
 ├── data/
-│   └── bundled-data.json         # 10 MB (68k léků, 2662 lékáren, 8480 úhrad, 6907 ATC)
+│   └── bundled-data.json         # 10.4 MB (68k léků, 2662 lékáren, 8480 úhrad, 6907 ATC)
+├── scripts/
+│   ├── build-pharmacies.ts       # Stažení a zpracování dat lékáren
+│   └── build-reimbursements.ts   # Stažení a zpracování dat úhrad (SCAU)
 ├── tests/                        # Vitest testy (28)
 ├── .github/workflows/
-│   └── update-data.yml           # Měsíční aktualizace dat z SÚKL
+│   ├── update-data.yml           # Měsíční aktualizace dat z SÚKL
+│   ├── claude.yml                # Claude CI workflow
+│   └── claude-code-review.yml    # Claude code review
 ├── vercel.json                   # Deployment config + CORS
 └── smithery.yaml                 # MCP registry
 ```
@@ -153,14 +158,14 @@ SUKL-mcp/
 
 ### Data
 
-Aplikace používá bundled JSON soubor (`data/bundled-data.json`, ~10 MB) obsahující:
+Aplikace používá bundled JSON soubor (`data/bundled-data.json`, 10.4 MB) obsahující:
 
 - **68 248** léčivých přípravků z SÚKL
 - **6 907** ATC klasifikačních kódů
 - **2 662** lékáren
 - **8 480** záznamů o úhradách a cenách
 
-Data jsou lazy-loaded při prvním požadavku a cachována v paměti. Automatická měsíční aktualizace přes GitHub Actions workflow (28. den v měsíci).
+Data jsou lazy-loaded při prvním požadavku a cachována v paměti. Automatická měsíční aktualizace přes GitHub Actions workflow (28. den v měsíci). Manuální aktualizace: `npx tsx scripts/build-pharmacies.ts` a `npx tsx scripts/build-reimbursements.ts`.
 
 ### PIL/SPC dokumenty
 
@@ -189,7 +194,7 @@ Projekt je nasazený na Vercel:
 ## Známá omezení
 
 - **PIL/SPC vrací URL** — nástroje vrací odkaz na PDF ke stažení z SÚKL API, ne parsovaný obsah. Pro extrakci textu z PDF použijte docling-mcp.
-- **Cold start** — první požadavek na Vercel může být pomalejší kvůli lazy-loading ~10 MB JSON
+- **Cold start** — první požadavek na Vercel může být pomalejší kvůli lazy-loading 10.4 MB JSON
 - **In-memory rate limiting** — reset při serverless cold start (100 req/min MCP, 10 req/min demo)
 
 ---
