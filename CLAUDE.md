@@ -16,9 +16,12 @@ npm install       # Install dependencies
 npm run dev       # Dev server (http://localhost:3000)
 npm run build     # Production build (also runs TypeScript check)
 npm start         # Start production server
+npm test          # Run Vitest tests
+npm run test:watch # Vitest watch mode
+npm run analyze   # Bundle size analysis (opens browser)
 ```
 
-No test runner is configured. Verify changes with `npm run build` (catches TypeScript errors).
+Tests: `npm test` runs Vitest (28 tests: unit + integration). Config in `vitest.config.ts`.
 
 ## Architecture
 
@@ -77,13 +80,6 @@ The demo section uses a state machine orchestrator pattern:
 
 ## Known Constraints
 
-- PIL/SPC document content not implemented — returns placeholder text
+- PIL/SPC returns download URL from SÚKL API (prehledy.sukl.cz) — PDF parsing via docling-mcp companion
 - In-memory rate limiting resets on serverless cold start
 - Cold start may be slow due to 10.4 MB JSON lazy-loading
-
-## Active Technologies
-- TypeScript 5+ / Next.js 16.1.6 / React 19.2.3 + Fuse.js 7.1 (fuzzy search), framer-motion 12, Radix UI, lucide-react, clsx + tailwind-merge (001-production-ready)
-- `data/bundled-data.json` (9.5 MB, committed, lazy-loaded via `fs.readFileSync`) (001-production-ready)
-
-## Recent Changes
-- 001-production-ready: Added TypeScript 5+ / Next.js 16.1.6 / React 19.2.3 + Fuse.js 7.1 (fuzzy search), framer-motion 12, Radix UI, lucide-react, clsx + tailwind-merge
