@@ -1,5 +1,7 @@
 # EPIC 1: Production Ready — Implementation Plan
 
+> **ARCHIV — DOKONČEN** (PR #35, merged 2026-02-17). Aktuální stav viz `2026-02-20-roadmap-status.md`.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Stabilní, bezpečná produkce se 6/9 MCP tools funkčními na reálných datech SÚKL.
