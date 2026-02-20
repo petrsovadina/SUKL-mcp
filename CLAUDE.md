@@ -12,7 +12,7 @@ SUKL MCP Server — Next.js 16 application providing AI agents access to the Cze
 ## Commands
 
 ```bash
-npm install        # Install dependencies
+npm install        # Install dependencies.
 npm run dev        # Dev server (http://localhost:3000)
 npm run build      # Production build (also runs TypeScript check)
 npm start          # Start production server
