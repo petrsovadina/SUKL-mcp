@@ -5,6 +5,7 @@
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue.svg)](https://www.typescriptlang.org/)
 [![MCP Protocol](https://img.shields.io/badge/MCP-2025--03--26-green.svg)](https://modelcontextprotocol.io/)
+[![Tests](https://img.shields.io/badge/tests-28%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > Konsolidovaná aplikace: landing page + MCP Streamable HTTP endpoint + demo chat na jedné URL.
@@ -199,9 +200,24 @@ Tento server poskytuje informace výhradně pro informační účely. Data mohou
 
 ---
 
+## Contributing
+
+```bash
+# Fork a klonovat repozitář
+git clone https://github.com/<your-username>/SUKL-mcp.git
+cd SUKL-mcp
+npm install
+npm test          # Ověřit, že testy procházejí
+npm run dev       # Spustit dev server
+```
+
+Pull requesty jsou vítány. Pro větší změny nejdříve otevřete issue k diskuzi.
+
+---
+
 ## License
 
-MIT License — viz [LICENSE](LICENSE).
+MIT License — viz [LICENSE](LICENSE). Copyright 2025-2026 Petr Sovadina.
 
 Data poskytnutá SÚKL pod podmínkami Open Data: https://opendata.sukl.cz/?q=podminky-uziti
 
