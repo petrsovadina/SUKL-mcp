@@ -1,27 +1,18 @@
 <!--
   SYNC IMPACT REPORT
   ====================
-  Version change: 1.2.0 → 1.3.0
-  Modified principles:
-    - IV. Build-as-Verification — rewritten to reflect Vitest adoption
-      (28 tests, no longer "optional"), `npm test` added as mandatory
-    - VI. Data Integrity — updated: build scripts exist (no longer
-      "plánováno"), added CI workflow reference
+  Version change: 1.3.0 → 1.3.1
+  Modified principles: none
   Modified sections:
-    - Technology & Deployment Constraints:
-      - Data size corrected: 9.5 MB → 10.4 MB
-      - UI components count: 11 → 12
-      - MCP rate limiting: "žádný" → 100 req/min (implemented)
-      - Demo rate limit: confirmed 10 req/min
+    - Technology & Deployment Constraints / Runtime & Frameworks:
+      - Added next-themes to UI primitiva list
     - Repository Structure:
-      - Removed docs/plans/ (deleted in cleanup)
-      - Added scripts/ directory (build-pharmacies.ts,
-        build-reimbursements.ts)
-      - Added tests/ directory (api/, lib/)
-      - Added .github/workflows/ (3 workflows)
+      - Added docs/ directory (api-reference.md, architecture.md)
+      - Added src/components/icons/ directory
+      - Added src/components/theme-provider.tsx, theme-toggle.tsx
+      - Added note about duplicate " 2" file artifacts
     - Development Workflow:
-      - Data automation: "plánována" → implemented (update-data.yml)
-      - Added `npm test` as verification step
+      - Added repository hygiene note about duplicate files
   Added sections: none
   Removed sections: none
   Templates requiring updates:
@@ -29,12 +20,14 @@
     - .specify/templates/spec-template.md — ✅ compatible
     - .specify/templates/tasks-template.md — ✅ compatible
     - .specify/templates/checklist-template.md — ✅ compatible
-    - .specify/templates/agent-file-template.md — ✅ compatible
-  Follow-up TODOs: none
-  Bump rationale: MINOR — Principle IV materially rewritten (testing
-  now mandatory), multiple factual corrections across deployment
-  constraints and repository structure after Epic 1+2 completion.
-  Validation: All claims cross-checked against actual file system.
+    - .specify/templates/constitution-template.md — ✅ compatible
+  Follow-up TODOs:
+    - Duplicate files (suffix " 2") across scripts/, workflows/,
+      ui/, vitest.config SHOULD be cleaned up (macOS artifacts)
+  Bump rationale: PATCH — Factual corrections to repository
+  structure and technology list. No principle changes.
+  Validation: All claims cross-checked against actual file system
+  on branch formulare (2026-02-25).
 -->
 
 # SÚKL MCP Server Constitution
@@ -176,6 +169,7 @@ konzistenci a zamezuje duplikaci přístupu k bundled datům.
 - **Animace:** framer-motion 12 (vždy lazy-loaded přes `next/dynamic`)
 - **Testing:** Vitest 4 (28 testů: unit + integration)
 - **UI primitiva:** Radix UI (accordion), lucide-react (ikony),
+  next-themes (přepínání světlý/tmavý režim),
   clsx + tailwind-merge (className utility v `src/lib/utils.ts`)
 - **Analytika:** Vercel Analytics + Umami (self-hosted na Railway)
 - **Path alias:** `@/*` mapuje na `./src/*` (tsconfig.json)
@@ -235,6 +229,9 @@ sukl-mcp/
 ├── CLAUDE.md                   # AI agent runtime guidance
 ├── data/
 │   └── bundled-data.json       # SÚKL data (10.4 MB, committed)
+├── docs/
+│   ├── api-reference.md        # API reference dokumentace
+│   └── architecture.md         # Architektura s Mermaid diagramy
 ├── scripts/
 │   ├── build-pharmacies.ts     # Stažení a zpracování lékáren
 │   └── build-reimbursements.ts # Stažení a zpracování úhrad (SCAU)
@@ -256,7 +253,10 @@ sukl-mcp/
 │   ├── components/
 │   │   ├── sections/           # 12 landing page sekcí
 │   │   ├── demo/               # 10 demo chat komponent
-│   │   └── ui/                 # 12 sdílených UI komponent
+│   │   ├── icons/              # SVG ikony (index.tsx)
+│   │   ├── ui/                 # 12 sdílených UI komponent
+│   │   ├── theme-provider.tsx  # next-themes provider
+│   │   └── theme-toggle.tsx    # Přepínač světlý/tmavý režim
 │   └── lib/
 │       ├── types.ts            # TypeScript interfaces (7 typů)
 │       ├── sukl-client.ts      # Server-only datová vrstva
@@ -280,6 +280,8 @@ sukl-mcp/
 - **CLAUDE.md:** Slouží jako runtime guidance soubor pro AI agenty.
   MUSÍ být aktualizován při změnách architektury, příkazů nebo
   konvencí.
+- **Hygiena repozitáře:** Duplicitní soubory s příponou " 2"
+  (macOS/iCloud artefakty) MUSÍ být odstraněny při zjištění.
 
 ## Governance
 
@@ -301,4 +303,4 @@ sukl-mcp/
   - Princip VI (zdroj dat je SÚKL)
   - Princip VII (sdílený kód v `src/lib/`, žádná duplikace)
 
-**Version**: 1.3.0 | **Ratified**: 2026-02-15 | **Last Amended**: 2026-02-20
+**Version**: 1.3.1 | **Ratified**: 2026-02-15 | **Last Amended**: 2026-02-25
