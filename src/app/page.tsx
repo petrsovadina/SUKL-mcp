@@ -8,6 +8,7 @@ import { HowItWorks } from "@/components/sections/how-it-works";
 import { UseCases } from "@/components/sections/use-cases";
 import { Stats } from "@/components/sections/stats";
 import { Why } from "@/components/sections/why";
+import { Pricing } from "@/components/sections/pricing";
 import { FAQ } from "@/components/sections/faq";
 import { CTA } from "@/components/sections/cta";
 import { Footer } from "@/components/sections/footer";
@@ -40,6 +41,7 @@ export default function Home() {
         <UseCases />
         <Stats />
         <Why />
+        <Pricing />
         <FAQ />
         <CTA />
       </main>

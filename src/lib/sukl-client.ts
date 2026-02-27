@@ -98,6 +98,7 @@ interface BundledData {
 
 interface DataStore {
   medicines: MedicineDetail[];
+  medicinesByCode: Map<string, MedicineDetail>;
   reimbursements: Map<string, ReimbursementInfo>;
   atcCodes: Map<string, ATCInfo>;
   pharmacies: Pharmacy[];
@@ -107,6 +108,7 @@ interface DataStore {
 
 const store: DataStore = {
   medicines: [],
+  medicinesByCode: new Map(),
   reimbursements: new Map(),
   atcCodes: new Map(),
   pharmacies: [],
@@ -212,8 +214,12 @@ export async function initializeData(): Promise<void> {
 
   const data = getBundledData();
 
-  // Transform medicines
+  // Transform medicines and build code→medicine Map
   store.medicines = data.m.map(transformBundledMedicine);
+  store.medicinesByCode.clear();
+  for (const med of store.medicines) {
+    store.medicinesByCode.set(med.sukl_code, med);
+  }
 
   // Build Fuse index
   store.fuseIndex = new Fuse(store.medicines, FUSE_OPTIONS);
@@ -235,7 +241,7 @@ export async function initializeData(): Promise<void> {
     store.reimbursements.clear();
     for (const r of data.r) {
       const info = transformBundledReimbursement(r);
-      store.reimbursements.set(info.sukl_code, info);
+      store.reimbursements.set(normalizeCode(info.sukl_code), info);
     }
   }
 
@@ -248,6 +254,20 @@ export async function initializeData(): Promise<void> {
 // ============================================================================
 // Public API
 // ============================================================================
+
+function toBasic(m: MedicineDetail): MedicineBasic {
+  return {
+    sukl_code: m.sukl_code,
+    name: m.name,
+    strength: m.strength,
+    form: m.form,
+    package: m.package,
+    atc_code: m.atc_code,
+    substance: m.substance,
+    holder: m.holder,
+    registration_status: m.registration_status,
+  };
+}
 
 export async function searchMedicines(
   query: string,
@@ -266,20 +286,9 @@ export async function searchMedicines(
   }
 
   const results = store.fuseIndex.search(query, { limit });
-  const medicines: MedicineBasic[] = results.map((r) => ({
-    sukl_code: r.item.sukl_code,
-    name: r.item.name,
-    strength: r.item.strength,
-    form: r.item.form,
-    package: r.item.package,
-    atc_code: r.item.atc_code,
-    substance: r.item.substance,
-    holder: r.item.holder,
-    registration_status: r.item.registration_status,
-  }));
 
   return {
-    medicines,
+    medicines: results.map((r) => toBasic(r.item)),
     total_count: results.length,
     search_time_ms: Math.round(performance.now() - startTime),
   };
@@ -289,15 +298,14 @@ export async function getMedicineByCode(
   suklCode: string
 ): Promise<MedicineDetail | null> {
   await initializeData();
-  const normalized = normalizeCode(suklCode);
-  return store.medicines.find((m) => m.sukl_code === normalized) || null;
+  return store.medicinesByCode.get(normalizeCode(suklCode)) ?? null;
 }
 
 export async function getReimbursement(
   suklCode: string
 ): Promise<ReimbursementInfo | null> {
   await initializeData();
-  return store.reimbursements.get(suklCode) || null;
+  return store.reimbursements.get(normalizeCode(suklCode)) ?? null;
 }
 
 export async function getATCInfo(
@@ -314,17 +322,7 @@ export async function getMedicinesByATC(
 
   return store.medicines
     .filter((m) => m.atc_code?.startsWith(atcCode))
-    .map((m) => ({
-      sukl_code: m.sukl_code,
-      name: m.name,
-      strength: m.strength,
-      form: m.form,
-      package: m.package,
-      atc_code: m.atc_code,
-      substance: m.substance,
-      holder: m.holder,
-      registration_status: m.registration_status,
-    }));
+    .map(toBasic);
 }
 
 export async function checkAvailability(
@@ -450,22 +448,3 @@ export async function findPharmacies(
   return results;
 }
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-export function getDataStats(): {
-  medicines_count: number;
-  reimbursements_count: number;
-  atc_codes_count: number;
-  pharmacies_count: number;
-  last_loaded: string | null;
-} {
-  return {
-    medicines_count: store.medicines.length,
-    reimbursements_count: store.reimbursements.size,
-    atc_codes_count: store.atcCodes.size,
-    pharmacies_count: store.pharmacies.length,
-    last_loaded: store.lastLoaded?.toISOString() || null,
-  };
-}

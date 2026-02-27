@@ -11,6 +11,7 @@
     "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
+    "@notionhq/client": "^5.10.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@vercel/analytics": "^1.6.1",
     "clsx": "^2.1.1",

@@ -1,24 +1,31 @@
 <!--
   SYNC IMPACT REPORT
   ====================
-  Version change: 1.1.0 → 1.2.0
+  Version change: 1.3.1 → 1.3.2
   Modified principles:
-    - VI. Data Integrity — removed references to nonexistent scripts
-    - VII. Monorepo Architecture → VII. Unified Monolith (rewritten,
-      removed false Turborepo claims after codebase validation)
+    - II. Plain TypeScript: Updated validation description to
+      reference ValidationError class (replaces generic "utility
+      functions" wording). Added ToolResponse type alias and
+      textResponse() helper mention.
+  Modified sections:
+    - Technology & Deployment Constraints / Runtime & Frameworks:
+      - Vitest version updated to 4.0
+    - Development Workflow:
+      - Removed duplicate file TODO (cleanup completed)
   Added sections: none
   Removed sections: none
   Templates requiring updates:
     - .specify/templates/plan-template.md — ✅ compatible
     - .specify/templates/spec-template.md — ✅ compatible
     - .specify/templates/tasks-template.md — ✅ compatible
-    - .specify/templates/checklist-template.md — ✅ compatible
-    - .specify/templates/agent-file-template.md — ✅ compatible
+    - .specify/templates/constitution-template.md — ✅ compatible
   Follow-up TODOs: none
-  Bump rationale: MINOR — principle VII materially rewritten after
-  codebase validation (Turborepo → Unified Monolith), repository
-  structure corrected, multiple factual errors fixed.
-  Validation: All claims cross-checked against actual file system.
+  Resolved TODOs from v1.3.1:
+    - ✅ Duplicate " 2" files cleaned up (14 files removed)
+  Bump rationale: PATCH — Wording clarification in Principle II
+  to match actual ValidationError implementation. No new principles.
+  Validation: Cross-checked against codebase on branch formulare,
+  all 28 tests pass (2026-02-26).
 -->
 
 # SÚKL MCP Server Constitution
@@ -31,13 +38,17 @@ Veškerý přístup k farmaceutickým datům probíhá výhradně na serveru.
 
 - `sukl-client.ts` používá `fs.readFileSync` a NESMÍ být nikdy importován
   v klientských komponentách (`"use client"`).
-- Data se načítají lazy z `data/bundled-data.json` (9.5 MB) a cachují
+- Data se načítají lazy z `data/bundled-data.json` (10.4 MB) a cachují
   se v paměti procesu. Opakovaný přístup MUSÍ používat sdílený in-memory
   store, nikoliv opakované čtení z disku.
 - Fuse.js index se vytváří jednou při prvním přístupu a zůstává
   v paměti po celou dobu životnosti procesu.
-- Nová datová pole (lékárny, úhrady, PIL/SPC) MUSÍ být přidána do
-  stejného bundled formátu nebo jako separátní JSON soubory v `data/`.
+- Vyhledávání léčiva podle kódu MUSÍ používat `medicinesByCode` Map
+  pro O(1) složitost (nikoliv lineární prohledávání pole).
+- Všechny SÚKL kódy MUSÍ být normalizovány pomocí `normalizeCode()`
+  konzistentně při ukládání i při vyhledávání (medicines i reimbursements).
+- Nová datová pole MUSÍ být přidána do stejného bundled formátu
+  nebo jako separátní JSON soubory v `data/`.
 
 **Zdůvodnění:** Serverless runtime na Vercel neumožňuje sdílení stavu
 mezi requesty jinak než přes module-level cache. Klientský import by
@@ -52,8 +63,12 @@ ani MCP frameworky (xMCP, fastmcp-js).
   nebo `type` v `src/lib/types.ts`.
 - MCP tools jsou implementovány jako plain funkce v `mcp-handler.ts`,
   volající `sukl-client.ts`.
-- Vstupní validace se provádí pomocí utility funkcí (`validateString`,
-  délkové kontroly) přímo v handler kódu.
+- Vstupní validace se provádí pomocí `ValidationError` třídy
+  a validačních funkcí (`validateString`, `validateArray`,
+  `validateNumber`) v `mcp-handler.ts`. Chybový typ `ValidationError`
+  MUSÍ být odlišen od systémových chyb pro správné HTTP kódy.
+- Návratové typy nástrojů používají `ToolResponse` type alias
+  a `textResponse()` helper pro konzistentní formátování odpovědí.
 
 **Zdůvodnění:** Projekt je dostatečně malý, aby typová bezpečnost
 TypeScriptu stačila. Runtime validace přidává zbytečnou závislost
@@ -73,21 +88,23 @@ Veškerý uživatelsky viditelný text MUSÍ být v češtině.
 **Zdůvodnění:** Primární uživatelská základna je česká. Data pochází
 ze SÚKL (Státní ústav pro kontrolu léčiv) a obsahují české texty.
 
-### IV. Build-as-Verification
+### IV. Build & Test Verification
 
-`npm run build` je primární a povinná verifikační metoda.
+`npm run build` a `npm test` jsou povinné verifikační metody.
 
 - Každá změna MUSÍ projít `npm run build` před commitem.
   Build provádí TypeScript type-checking a odhalí chyby typů,
   neexistující importy a nekompatibilní API.
-- Test runner (Vitest) je volitelný a MĚLA BY být přidána test suite
-  dle Epic 2 roadmapy, ale jeho absence NEBLOKUJE merge.
+- Každá změna MUSÍ projít `npm test` (Vitest, 28 testů: unit +
+  integration). Testy pokrývají demo-handler (13), mcp-handler (12)
+  a integrační flow (3).
+- Selhání testů BLOKUJE merge.
 - Linting a formatting tooling NEJSOU konfigurovány. Konzistence
   stylu je zajištěna konvencemi v CLAUDE.md.
 
-**Zdůvodnění:** Pro projekt této velikosti (< 20 zdrojových souborů)
-je TypeScript build dostatečný. Automatizované testy budou přidány
-v Epic 2 (Vitest).
+**Zdůvodnění:** TypeScript build + Vitest testy společně zajišťují
+typovou bezpečnost i funkční korektnost. Test suite ověřuje kritické
+cesty MCP protokolu a demo interakcí.
 
 ### V. Simplicity (YAGNI)
 
@@ -102,6 +119,8 @@ požadavkem.
 - Framer-motion komponenty MUSÍ být lazy-loaded přes `next/dynamic`
   aby se nezdržoval initial bundle.
 - Každá nová npm závislost MUSÍ být zdůvodněna v commit message.
+- Duplicitní kód MUSÍ být extrahován do sdílených helperů
+  (`toBasic()`, `textResponse()`) pokud se vyskytuje ve 3+ místech.
 
 **Zdůvodnění:** Menší codebase = snazší údržba. Projekt je single-page
 aplikace s API endpointy, ne enterprise SaaS.
@@ -113,8 +132,10 @@ Farmaceutická data MUSÍ pocházet výhradně z oficiálních zdrojů SÚKL.
 - Primární zdroj: `opendata.sukl.cz` (CSV soubory, měsíční aktualizace).
 - `data/bundled-data.json` MUSÍ být commitnut do repozitáře — je
   vyžadován při build time i runtime na Vercel.
-- Budoucí data build skripty (plánováno v Epic 1/2) MUSÍ zpracovávat
-  win-1250 encoding korektně.
+- Data build skripty v `scripts/` (`build-pharmacies.ts`,
+  `build-reimbursements.ts`) zpracovávají win-1250 encoding.
+- CI workflow `update-data.yml` automaticky aktualizuje data měsíčně
+  (28. den měsíce).
 - Při aktualizaci dat MUSÍ být zachována zpětná kompatibilita
   formátu bundled JSON (klíče `m`, `a`, `p`, `r`, `_`).
 
@@ -135,7 +156,7 @@ aplikační oblasti sdílející jeden deployment.
   - `src/components/sections/` — 12 landing page sekcí
   - `src/components/demo/` — 10 demo chat komponent
   - `src/app/api/` — 2 API routes (MCP + demo backend)
-- `src/components/ui/` obsahuje 11 sdílených UI komponent
+- `src/components/ui/` obsahuje 12 sdílených UI komponent
   používaných napříč oblastmi.
 - Nové oblasti (např. admin panel, dokumentace) MUSÍ být přidány
   jako další sekce/routes v rámci stejné Next.js aplikace,
@@ -154,7 +175,9 @@ konzistenci a zamezuje duplikaci přístupu k bundled datům.
   `--sukl-blue`, `--sukl-light-blue`) definovanými v `globals.css`
 - **Search:** Fuse.js 7.1 pro fuzzy matching (in-memory index)
 - **Animace:** framer-motion 12 (vždy lazy-loaded přes `next/dynamic`)
+- **Testing:** Vitest 4 (28 testů: unit + integration)
 - **UI primitiva:** Radix UI (accordion), lucide-react (ikony),
+  next-themes (přepínání světlý/tmavý režim),
   clsx + tailwind-merge (className utility v `src/lib/utils.ts`)
 - **Analytika:** Vercel Analytics + Umami (self-hosted na Railway)
 - **Path alias:** `@/*` mapuje na `./src/*` (tsconfig.json)
@@ -167,6 +190,7 @@ Repozitář obsahuje tři vzájemně propojené aplikační oblasti:
 1. **MCP Server** (`src/app/api/mcp/route.ts`, `src/lib/mcp-handler.ts`)
    - JSON-RPC 2.0 over HTTP, 9 nástrojů pro přístup k SÚKL datům
    - CORS wildcard (potřeba pro AI agenty)
+   - Rate limit: 100 req/min per IP (in-memory Map)
    - Cílová skupina: AI agenti (Claude, GPT, vlastní integrace)
    - Priorita vývoje: **nejvyšší**
 
@@ -186,7 +210,7 @@ Repozitář obsahuje tři vzájemně propojené aplikační oblasti:
    - localStorage persistuje stav touru (`sukl-tour-complete`,
      `sukl-tour-skipped`)
    - Pattern matching backend (žádné LLM)
-   - Rate limit: 10 req/min per IP (implementováno)
+   - Rate limit: 10 req/min per IP (in-memory Map)
    - Cílová skupina: potenciální uživatelé k vyzkoušení
    - Priorita vývoje: **nižší**
 
@@ -198,8 +222,7 @@ Repozitář obsahuje tři vzájemně propojené aplikační oblasti:
   CORS headers pro MCP endpoint
 - **MCP protokol:** JSON-RPC 2.0 over HTTP, 9 tools, CORS wildcard
 - **Rate limiting:** In-memory Map (resetuje se při cold start);
-  demo API: 10 req/min (implementováno);
-  MCP API: žádný rate limit (plánováno 100 req/min v Epic 1)
+  MCP API: 100 req/min per IP; Demo API: 10 req/min per IP
 
 ### Repository Structure
 
@@ -210,11 +233,23 @@ sukl-mcp/
 ├── smithery.yaml               # Smithery MCP registry
 ├── tsconfig.json               # TypeScript config + path aliases
 ├── next.config.ts              # Next.js configuration
+├── vitest.config.ts            # Vitest test configuration
 ├── CLAUDE.md                   # AI agent runtime guidance
 ├── data/
-│   └── bundled-data.json       # SÚKL data (9.5 MB, committed)
+│   └── bundled-data.json       # SÚKL data (10.4 MB, committed)
 ├── docs/
-│   └── plans/                  # Epic roadmapy a implementační plány
+│   ├── api-reference.md        # API reference dokumentace
+│   └── architecture.md         # Architektura s Mermaid diagramy
+├── scripts/
+│   ├── build-pharmacies.ts     # Stažení a zpracování lékáren
+│   └── build-reimbursements.ts # Stažení a zpracování úhrad (SCAU)
+├── tests/
+│   ├── api/                    # Integration testy (MCP flow)
+│   └── lib/                    # Unit testy (mcp-handler, demo-handler)
+├── .github/workflows/
+│   ├── update-data.yml         # Měsíční aktualizace dat (cron 28.)
+│   ├── claude.yml              # Claude CI workflow
+│   └── claude-code-review.yml  # Claude code review workflow
 ├── src/
 │   ├── app/
 │   │   ├── page.tsx            # Landing page (12 sekcí)
@@ -226,7 +261,10 @@ sukl-mcp/
 │   ├── components/
 │   │   ├── sections/           # 12 landing page sekcí
 │   │   ├── demo/               # 10 demo chat komponent
-│   │   └── ui/                 # 11 sdílených UI komponent
+│   │   ├── icons/              # SVG ikony (index.tsx)
+│   │   ├── ui/                 # 12 sdílených UI komponent
+│   │   ├── theme-provider.tsx  # next-themes provider
+│   │   └── theme-toggle.tsx    # Přepínač světlý/tmavý režim
 │   └── lib/
 │       ├── types.ts            # TypeScript interfaces (7 typů)
 │       ├── sukl-client.ts      # Server-only datová vrstva
@@ -240,18 +278,18 @@ sukl-mcp/
 
 ## Development Workflow
 
-- **Verifikace:** `npm run build` před každým commitem.
+- **Verifikace:** `npm run build` a `npm test` před každým commitem.
 - **Branching:** Feature branches z `main`, PR pro merge.
 - **Commit messages:** Conventional Commits (`feat:`, `fix:`, `chore:`,
   `docs:`, `ci:`, `test:`).
 - **Priorita vývoje:** MCP endpoint > Landing page > Demo chat.
-- **Data aktualizace:** Měsíčně po vydání nových dat SÚKL (27. den
-  měsíce). Automatizace plánována v Epic 2 (GitHub Action).
+- **Data aktualizace:** Automaticky měsíčně (28. den) přes GitHub
+  Action (`update-data.yml`). Manuálně: `npx tsx scripts/build-*.ts`.
 - **CLAUDE.md:** Slouží jako runtime guidance soubor pro AI agenty.
   MUSÍ být aktualizován při změnách architektury, příkazů nebo
   konvencí.
-- **Docs:** Implementační plány v `docs/plans/`. Epicy a roadmapa
-  dokumentovány s datem a verzí.
+- **Hygiena repozitáře:** Duplicitní soubory s příponou " 2"
+  (macOS/iCloud artefakty) MUSÍ být odstraněny při zjištění.
 
 ## Governance
 
@@ -268,8 +306,9 @@ sukl-mcp/
   této konstituce. Reviewer ověří zejména:
   - Princip I (žádný klientský import serverových modulů)
   - Princip II (žádné nové runtime validační knihovny)
+  - Princip IV (build + testy MUSÍ projít)
   - Princip V (zdůvodnění nových závislostí)
   - Princip VI (zdroj dat je SÚKL)
   - Princip VII (sdílený kód v `src/lib/`, žádná duplikace)
 
-**Version**: 1.2.0 | **Ratified**: 2026-02-15 | **Last Amended**: 2026-02-15
+**Version**: 1.3.2 | **Ratified**: 2026-02-15 | **Last Amended**: 2026-02-26
