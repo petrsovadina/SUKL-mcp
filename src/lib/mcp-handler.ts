@@ -12,7 +12,6 @@ import {
   findPharmacies,
   getATCInfo,
   getMedicinesByATC,
-  getDataStats,
 } from "./sukl-client";
 
 // ============================================================================
@@ -213,23 +212,30 @@ const SERVER_INFO = {
 // Tool Execution
 // ============================================================================
 
+class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
 function validateString(value: unknown, name: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(`Parametr '${name}' musí být neprázdný řetězec.`);
+    throw new ValidationError(`Parametr '${name}' musí být neprázdný řetězec.`);
   }
   return value.trim();
 }
 
 function validateArray(value: unknown, name: string, maxItems: number): string[] {
   if (!Array.isArray(value) || value.length === 0) {
-    throw new Error(`Parametr '${name}' musí být neprázdné pole řetězců.`);
+    throw new ValidationError(`Parametr '${name}' musí být neprázdné pole řetězců.`);
   }
   if (value.length > maxItems) {
-    throw new Error(`Maximální počet položek v '${name}' je ${maxItems}.`);
+    throw new ValidationError(`Maximální počet položek v '${name}' je ${maxItems}.`);
   }
   return value.map((item, i) => {
     if (typeof item !== "string" || item.trim().length === 0) {
-      throw new Error(`Položka ${i + 1} v '${name}' musí být neprázdný řetězec.`);
+      throw new ValidationError(`Položka ${i + 1} v '${name}' musí být neprázdný řetězec.`);
     }
     return item.trim();
   });
@@ -242,10 +248,16 @@ function validateNumber(value: unknown, fallback: number, min: number, max: numb
   return Math.max(min, Math.min(max, Math.round(n)));
 }
 
+type ToolResponse = { content: { type: string; text: string }[] };
+
+function textResponse(text: string): ToolResponse {
+  return { content: [{ type: "text", text }] };
+}
+
 async function executeTool(
   name: string,
   args: Record<string, unknown>
-): Promise<{ content: { type: string; text: string }[] }> {
+): Promise<ToolResponse> {
   const startTime = performance.now();
   try {
     let result: unknown;
@@ -254,7 +266,7 @@ async function executeTool(
       case "search-medicine": {
         const query = validateString(args.query, "query");
         if (query.length > 200) {
-          throw new Error("Vyhledávací dotaz nesmí překročit 200 znaků.");
+          throw new ValidationError("Vyhledávací dotaz nesmí překročit 200 znaků.");
         }
         const limit = validateNumber(args.limit, 20, 1, 100);
         result = await searchMedicines(query, limit);
@@ -264,14 +276,8 @@ async function executeTool(
         const code = validateString(args.sukl_code, "sukl_code");
         result = await getMedicineByCode(code);
         if (!result) {
-          return logAndReturn(name, args, startTime, "ok", {
-            content: [
-              {
-                type: "text",
-                text: `Lék s SÚKL kódem '${code}' nebyl nalezen.`,
-              },
-            ],
-          });
+          return logAndReturn(name, args, startTime, "ok",
+            textResponse(`Lék s SÚKL kódem '${code}' nebyl nalezen.`));
         }
         break;
       }
@@ -279,14 +285,8 @@ async function executeTool(
         const code = validateString(args.sukl_code, "sukl_code");
         result = await checkAvailability(code);
         if (!result) {
-          return logAndReturn(name, args, startTime, "ok", {
-            content: [
-              {
-                type: "text",
-                text: `Lék s SÚKL kódem '${code}' nebyl nalezen.`,
-              },
-            ],
-          });
+          return logAndReturn(name, args, startTime, "ok",
+            textResponse(`Lék s SÚKL kódem '${code}' nebyl nalezen.`));
         }
         break;
       }
@@ -305,14 +305,8 @@ async function executeTool(
 
         const atcInfo = await getATCInfo(atcCode);
         if (!atcInfo) {
-          return logAndReturn(name, args, startTime, "ok", {
-            content: [
-              {
-                type: "text",
-                text: `ATC kód '${atcCode}' nebyl nalezen.`,
-              },
-            ],
-          });
+          return logAndReturn(name, args, startTime, "ok",
+            textResponse(`ATC kód '${atcCode}' nebyl nalezen.`));
         }
 
         if (includeMedicines) {
@@ -331,14 +325,8 @@ async function executeTool(
         const code = validateString(args.sukl_code, "sukl_code");
         result = await getReimbursement(code);
         if (!result) {
-          return logAndReturn(name, args, startTime, "ok", {
-            content: [
-              {
-                type: "text",
-                text: `Informace o úhradě pro SÚKL kód '${code}' nejsou k dispozici.`,
-              },
-            ],
-          });
+          return logAndReturn(name, args, startTime, "ok",
+            textResponse(`Informace o úhradě pro SÚKL kód '${code}' nejsou k dispozici.`));
         }
         break;
       }
@@ -346,14 +334,8 @@ async function executeTool(
         const code = validateString(args.sukl_code, "sukl_code");
         result = await getDocumentContent(code, "PIL");
         if (!result) {
-          return logAndReturn(name, args, startTime, "ok", {
-            content: [
-              {
-                type: "text",
-                text: `Příbalový leták pro SÚKL kód '${code}' nebyl nalezen.`,
-              },
-            ],
-          });
+          return logAndReturn(name, args, startTime, "ok",
+            textResponse(`Příbalový leták pro SÚKL kód '${code}' nebyl nalezen.`));
         }
         break;
       }
@@ -361,14 +343,8 @@ async function executeTool(
         const code = validateString(args.sukl_code, "sukl_code");
         result = await getDocumentContent(code, "SPC");
         if (!result) {
-          return logAndReturn(name, args, startTime, "ok", {
-            content: [
-              {
-                type: "text",
-                text: `SPC pro SÚKL kód '${code}' nebylo nalezeno.`,
-              },
-            ],
-          });
+          return logAndReturn(name, args, startTime, "ok",
+            textResponse(`SPC pro SÚKL kód '${code}' nebylo nalezeno.`));
         }
         break;
       }
@@ -378,35 +354,28 @@ async function executeTool(
           codes.map((code) => checkAvailability(code))
         );
         const validResults = results.filter(Boolean);
+        let availableCount = 0;
+        let unavailableCount = 0;
+        for (const r of validResults) {
+          if (r?.status === "available") availableCount++;
+          else if (r?.status === "unavailable") unavailableCount++;
+        }
         result = {
           results: validResults,
           total_checked: codes.length,
-          available_count: validResults.filter(
-            (r) => r?.status === "available"
-          ).length,
-          unavailable_count: validResults.filter(
-            (r) => r?.status === "unavailable"
-          ).length,
+          available_count: availableCount,
+          unavailable_count: unavailableCount,
           checked_at: new Date().toISOString(),
         };
         break;
       }
       default:
-        return logAndReturn(name, args, startTime, "ok", {
-          content: [
-            { type: "text", text: `Neznámý nástroj: '${name}'` },
-          ],
-        });
+        return logAndReturn(name, args, startTime, "ok",
+          textResponse(`Neznámý nástroj: '${name}'`));
     }
 
-    return logAndReturn(name, args, startTime, "ok", {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    });
+    return logAndReturn(name, args, startTime, "ok",
+      textResponse(JSON.stringify(result, null, 2)));
   } catch (error) {
     const duration_ms = Math.round(performance.now() - startTime);
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -418,22 +387,11 @@ async function executeTool(
       status: "error",
       error: errorMessage,
     }));
-    const isValidation = error instanceof Error && (
-      errorMessage.startsWith("Parametr") ||
-      errorMessage.startsWith("Vyhledávací") ||
-      errorMessage.startsWith("Maximální") ||
-      errorMessage.startsWith("Položka")
+    return textResponse(
+      error instanceof ValidationError
+        ? errorMessage
+        : "Chyba při zpracování požadavku. Zkuste to znovu.",
     );
-    return {
-      content: [
-        {
-          type: "text",
-          text: isValidation
-            ? errorMessage
-            : "Chyba při zpracování požadavku. Zkuste to znovu.",
-        },
-      ],
-    };
   }
 }
 
@@ -442,8 +400,8 @@ function logAndReturn(
   params: Record<string, unknown>,
   startTime: number,
   status: "ok" | "error",
-  response: { content: { type: string; text: string }[] },
-): { content: { type: string; text: string }[] } {
+  response: ToolResponse,
+): ToolResponse {
   const duration_ms = Math.round(performance.now() - startTime);
   console.log(JSON.stringify({
     event: "mcp_tool_call",

@@ -123,9 +123,11 @@ SUKL-mcp/
 │   │       └── demo/route.ts     # Demo chat backend (rate limited)
 │   ├── components/
 │   │   ├── sections/             # 12 landing page sekcí
-│   │   ├── demo/                 # Guided tour + chat widget
-│   │   ├── ui/                   # Reusable UI komponenty
-│   │   └── theme-provider.tsx    # next-themes provider
+│   │   ├── demo/                 # Guided tour + chat widget (10 komponent)
+│   │   ├── icons/                # SVG ikony
+│   │   ├── ui/                   # 12 reusable UI komponent
+│   │   ├── theme-provider.tsx    # next-themes provider
+│   │   └── theme-toggle.tsx      # Přepínač dark/light mode
 │   └── lib/
 │       ├── sukl-client.ts        # Data layer (Fuse.js, lazy-loaded JSON)
 │       ├── types.ts              # TypeScript interfaces
@@ -134,6 +136,9 @@ SUKL-mcp/
 │       └── utils.ts              # cn() helper
 ├── data/
 │   └── bundled-data.json         # 10.4 MB (68k léků, 2662 lékáren, 8480 úhrad, 6907 ATC)
+├── docs/
+│   ├── api-reference.md          # API reference (specifikace 9 tools)
+│   └── architecture.md           # Architektura s Mermaid diagramy
 ├── scripts/
 │   ├── build-pharmacies.ts       # Stažení a zpracování dat lékáren
 │   └── build-reimbursements.ts   # Stažení a zpracování dat úhrad (SCAU)
@@ -148,12 +153,14 @@ SUKL-mcp/
 
 ### Technologie
 
-- **Next.js 16** — App Router, React 19, Turbopack
+- **Next.js 16.1.6** — App Router, React 19.2.3, Turbopack
 - **TypeScript 5** — Strict mode, plain interfaces (bez Zod)
-- **Tailwind CSS 4** — Custom theme s CSS proměnnými
-- **Fuse.js** — Fuzzy search přes 68k+ záznamů
-- **Framer Motion** — Animace na landing page
-- **Vitest** — Unit a integrační testy
+- **Tailwind CSS 4** — Custom theme s CSS proměnnými (dark/light)
+- **Fuse.js 7.1** — Fuzzy search přes 68k+ záznamů
+- **Framer Motion 12** — Animace na landing page (lazy-loaded)
+- **next-themes** — Dark/light mode
+- **Radix UI** — Accordion, **lucide-react** — ikony
+- **Vitest 4** — Unit a integrační testy (28)
 - **Vercel** — Deployment (region `fra1`)
 
 ### Data

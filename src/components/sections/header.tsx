@@ -31,6 +31,7 @@ export function Header() {
         <div className="hidden md:flex items-center gap-6">
           <NavLink href="#tools">Tools</NavLink>
           <NavLink href="#how-it-works">Jak to funguje</NavLink>
+          <NavLink href="#pricing">Ceník</NavLink>
           <NavLink href="#faq">FAQ</NavLink>
           
           <div className="h-4 w-px bg-dark-border" />
@@ -87,6 +88,9 @@ export function Header() {
             </MobileNavLink>
             <MobileNavLink href="#how-it-works" onClick={() => setMobileMenuOpen(false)}>
               Jak to funguje
+            </MobileNavLink>
+            <MobileNavLink href="#pricing" onClick={() => setMobileMenuOpen(false)}>
+              Ceník
             </MobileNavLink>
             <MobileNavLink href="#faq" onClick={() => setMobileMenuOpen(false)}>
               FAQ

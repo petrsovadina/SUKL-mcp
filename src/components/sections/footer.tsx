@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Github, Linkedin, Mail, Phone, MapPin } from "lucide-react";
+import { Github, Linkedin, Mail, Phone, MapPin, ArrowRight, Loader2, CheckCircle } from "lucide-react";
 
 const DATA = {
   name: "Petr Sovadina",
@@ -19,6 +20,7 @@ const DATA = {
   },
   navbar: [
     { href: "#tools", label: "Funkce" },
+    { href: "#pricing", label: "Ceník" },
     { href: "#quickstart", label: "Rychlý start" },
     { href: "#faq", label: "FAQ" },
   ],
@@ -124,6 +126,9 @@ export function Footer() {
           </div>
         </div>
         
+        {/* Newsletter signup */}
+        <NewsletterForm />
+
         {/* Bottom - Large name with light/dark mode images */}
         <div className="w-full flex mt-8 items-center justify-center">
           <div className="relative">
@@ -145,5 +150,87 @@ export function Footer() {
         </div>
       </div>
     </footer>
+  );
+}
+
+function NewsletterForm() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus("loading");
+
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error || "Něco se pokazilo.");
+        setStatus("error");
+        return;
+      }
+
+      setStatus("success");
+      setEmail("");
+    } catch {
+      setErrorMsg("Nepodařilo se přihlásit. Zkuste to znovu.");
+      setStatus("error");
+    }
+  }
+
+  if (status === "success") {
+    return (
+      <div className="mt-8 pt-8 border-t border-border">
+        <div className="flex items-center justify-center gap-2 text-teal">
+          <CheckCircle className="w-5 h-5" />
+          <span className="text-sm font-medium">Přihlášení k odběru bylo úspěšné!</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 pt-8 border-t border-border">
+      <div className="max-w-md mx-auto text-center">
+        <h3 className="font-semibold text-foreground mb-2">Novinky o SÚKL MCP</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Nové funkce, aktualizace dat a tipy pro integraci. Maximálně 2x měsíčně.
+        </p>
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setStatus("idle"); }}
+            placeholder="vas@email.cz"
+            className="flex-1 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink/50 focus:border-pink transition-colors text-sm"
+          />
+          <button
+            type="submit"
+            disabled={status === "loading"}
+            className="px-4 py-2.5 rounded-lg bg-pink text-white font-medium hover:bg-pink/90 transition-colors disabled:opacity-50 flex items-center gap-1.5 text-sm shrink-0"
+          >
+            {status === "loading" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                Odebírat
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
+          </button>
+        </form>
+        {status === "error" && (
+          <p className="text-xs text-red-400 mt-2">{errorMsg}</p>
+        )}
+      </div>
+    </div>
   );
 }

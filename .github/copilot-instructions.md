@@ -17,12 +17,15 @@ Jeden deployment obsahuje tři funkce:
 ### 1. Datová vrstva (`src/lib/sukl-client.ts`)
 - **Server-only** modul — používá `fs.readFileSync` pro lazy-loading `data/bundled-data.json` (10.4 MB).
 - **Fuse.js** index pro fuzzy vyhledávání přes 68k+ záznamů.
+- **O(1) lookup** léků podle kódu přes `medicinesByCode` Map (ne lineární scan).
+- **`normalizeCode()`** — SÚKL kódy jsou normalizovány (odstranění vedoucích nul) konzistentně při ukládání i vyhledávání.
 - Data: 68 248 léčiv, 6 907 ATC kódů, 2 662 lékáren, 8 480 záznamů o úhradách.
 - **Nikdy neimportovat v klientských komponentách.**
 
 ### 2. MCP vrstva (`src/lib/mcp-handler.ts`)
 - JSON-RPC 2.0 handler implementující 9 MCP nástrojů.
 - Volá funkce z `sukl-client.ts`.
+- **`ValidationError`** třída pro vstupní validaci (detekce přes `instanceof`, ne string-prefix).
 - Rate limiting: 100 req/min per IP (in-memory).
 
 ### 3. Demo vrstva (`src/lib/demo-handler.ts`)
@@ -38,6 +41,10 @@ Jeden deployment obsahuje tři funkce:
 - Plain **TypeScript interfaces** — bez Zod, bez Pydantic.
 - Všechny datové struktury na jednom místě.
 
+### 6. Dokumentace (`docs/`)
+- `api-reference.md` — specifikace 9 MCP nástrojů, datové typy, příklady
+- `architecture.md` — architektura s Mermaid diagramy
+
 ## Vývojový proces
 
 ```bash
@@ -52,10 +59,11 @@ npm run analyze   # Analýza velikosti bundlu
 
 ## Konvence kódování
 
-- **Framework**: Next.js 16 (App Router, React 19, Turbopack)
+- **Framework**: Next.js 16.1.6 (App Router, React 19.2.3, Turbopack)
 - **TypeScript 5**: Strict mode, plain interfaces (bez Zod)
 - **Tailwind CSS 4**: Custom theme s CSS proměnnými (`--sukl-navy`, `--sukl-blue`, `--sukl-light-blue`) v `globals.css`
-- **Framer Motion**: Animace na landing page, obalit těžké komponenty s `next/dynamic`
+- **Framer Motion 12**: Animace na landing page, obalit těžké komponenty s `next/dynamic`
+- **next-themes**: Dark/light mode přepínání (`theme-provider.tsx`, `theme-toggle.tsx`)
 - **Path alias**: `@/*` → `./src/*`
 - **Jazyk UI**: Veškerý uživatelský text v **češtině**
 

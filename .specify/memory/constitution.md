@@ -1,33 +1,31 @@
 <!--
   SYNC IMPACT REPORT
   ====================
-  Version change: 1.3.0 → 1.3.1
-  Modified principles: none
+  Version change: 1.3.1 → 1.3.2
+  Modified principles:
+    - II. Plain TypeScript: Updated validation description to
+      reference ValidationError class (replaces generic "utility
+      functions" wording). Added ToolResponse type alias and
+      textResponse() helper mention.
   Modified sections:
     - Technology & Deployment Constraints / Runtime & Frameworks:
-      - Added next-themes to UI primitiva list
-    - Repository Structure:
-      - Added docs/ directory (api-reference.md, architecture.md)
-      - Added src/components/icons/ directory
-      - Added src/components/theme-provider.tsx, theme-toggle.tsx
-      - Added note about duplicate " 2" file artifacts
+      - Vitest version updated to 4.0
     - Development Workflow:
-      - Added repository hygiene note about duplicate files
+      - Removed duplicate file TODO (cleanup completed)
   Added sections: none
   Removed sections: none
   Templates requiring updates:
     - .specify/templates/plan-template.md — ✅ compatible
     - .specify/templates/spec-template.md — ✅ compatible
     - .specify/templates/tasks-template.md — ✅ compatible
-    - .specify/templates/checklist-template.md — ✅ compatible
     - .specify/templates/constitution-template.md — ✅ compatible
-  Follow-up TODOs:
-    - Duplicate files (suffix " 2") across scripts/, workflows/,
-      ui/, vitest.config SHOULD be cleaned up (macOS artifacts)
-  Bump rationale: PATCH — Factual corrections to repository
-  structure and technology list. No principle changes.
-  Validation: All claims cross-checked against actual file system
-  on branch formulare (2026-02-25).
+  Follow-up TODOs: none
+  Resolved TODOs from v1.3.1:
+    - ✅ Duplicate " 2" files cleaned up (14 files removed)
+  Bump rationale: PATCH — Wording clarification in Principle II
+  to match actual ValidationError implementation. No new principles.
+  Validation: Cross-checked against codebase on branch formulare,
+  all 28 tests pass (2026-02-26).
 -->
 
 # SÚKL MCP Server Constitution
@@ -45,6 +43,10 @@ Veškerý přístup k farmaceutickým datům probíhá výhradně na serveru.
   store, nikoliv opakované čtení z disku.
 - Fuse.js index se vytváří jednou při prvním přístupu a zůstává
   v paměti po celou dobu životnosti procesu.
+- Vyhledávání léčiva podle kódu MUSÍ používat `medicinesByCode` Map
+  pro O(1) složitost (nikoliv lineární prohledávání pole).
+- Všechny SÚKL kódy MUSÍ být normalizovány pomocí `normalizeCode()`
+  konzistentně při ukládání i při vyhledávání (medicines i reimbursements).
 - Nová datová pole MUSÍ být přidána do stejného bundled formátu
   nebo jako separátní JSON soubory v `data/`.
 
@@ -61,8 +63,12 @@ ani MCP frameworky (xMCP, fastmcp-js).
   nebo `type` v `src/lib/types.ts`.
 - MCP tools jsou implementovány jako plain funkce v `mcp-handler.ts`,
   volající `sukl-client.ts`.
-- Vstupní validace se provádí pomocí utility funkcí (`validateString`,
-  délkové kontroly) přímo v handler kódu.
+- Vstupní validace se provádí pomocí `ValidationError` třídy
+  a validačních funkcí (`validateString`, `validateArray`,
+  `validateNumber`) v `mcp-handler.ts`. Chybový typ `ValidationError`
+  MUSÍ být odlišen od systémových chyb pro správné HTTP kódy.
+- Návratové typy nástrojů používají `ToolResponse` type alias
+  a `textResponse()` helper pro konzistentní formátování odpovědí.
 
 **Zdůvodnění:** Projekt je dostatečně malý, aby typová bezpečnost
 TypeScriptu stačila. Runtime validace přidává zbytečnou závislost
@@ -113,6 +119,8 @@ požadavkem.
 - Framer-motion komponenty MUSÍ být lazy-loaded přes `next/dynamic`
   aby se nezdržoval initial bundle.
 - Každá nová npm závislost MUSÍ být zdůvodněna v commit message.
+- Duplicitní kód MUSÍ být extrahován do sdílených helperů
+  (`toBasic()`, `textResponse()`) pokud se vyskytuje ve 3+ místech.
 
 **Zdůvodnění:** Menší codebase = snazší údržba. Projekt je single-page
 aplikace s API endpointy, ne enterprise SaaS.
@@ -303,4 +311,4 @@ sukl-mcp/
   - Princip VI (zdroj dat je SÚKL)
   - Princip VII (sdílený kód v `src/lib/`, žádná duplikace)
 
-**Version**: 1.3.1 | **Ratified**: 2026-02-15 | **Last Amended**: 2026-02-25
+**Version**: 1.3.2 | **Ratified**: 2026-02-15 | **Last Amended**: 2026-02-26

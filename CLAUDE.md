@@ -24,6 +24,8 @@ npm run analyze    # Bundle size analysis (opens browser)
 Run a single test file: `npx vitest run tests/lib/mcp-handler.test.ts`
 Run tests matching a name: `npx vitest run -t "search-medicine"`
 
+Manual data update: `npx tsx scripts/build-pharmacies.ts` and `npx tsx scripts/build-reimbursements.ts` (downloads from SUKL, handles WIN-1250 encoding).
+
 Tests: 28 total (13 demo-handler, 12 mcp-handler, 3 integration). Config in `vitest.config.ts`, test files in `tests/`.
 
 ## Architecture
@@ -41,7 +43,7 @@ Tests: 28 total (13 demo-handler, 12 mcp-handler, 3 integration). Config in `vit
 ```
 bundled-data.json (10.4 MB, committed)
         | fs.readFileSync (lazy, cached in memory)
-    sukl-client.ts (Fuse.js fuzzy search index)
+    sukl-client.ts (Fuse.js fuzzy search index, 1-hour cache TTL)
        /        \
 mcp-handler.ts    demo-handler.ts -> demo/route.ts
        |
@@ -49,6 +51,8 @@ mcp-handler.ts    demo-handler.ts -> demo/route.ts
 ```
 
 **Critical:** `sukl-client.ts` uses `fs.readFileSync` — it is server-only. Never import it in client components.
+
+Medicine lookup by code is O(1) via `medicinesByCode` Map (not linear scan). All SUKL codes are normalized (leading zeros stripped) via `normalizeCode()` consistently across medicines and reimbursements.
 
 ### Demo: Guided Tour system
 
@@ -62,18 +66,23 @@ The demo section uses a state machine orchestrator pattern:
 
 ### Component layers
 
-- `src/components/sections/` — Landing page sections (stateless, visual)
-- `src/components/demo/` — Demo chat system (guided tour + chat widget + message rendering)
-- `src/components/ui/` — Reusable animated components (shimmer-button, particles, typing-animation, etc.)
+- `src/components/sections/` — 12 landing page sections (stateless, visual)
+- `src/components/demo/` — 10 demo chat components (guided tour + chat widget + message rendering)
+- `src/components/ui/` — 12 reusable animated components (shimmer-button, particles, typing-animation, etc.)
+- `src/components/icons/` — SVG icon components (single barrel file, tree-shakeable)
+- `src/components/theme-provider.tsx` + `theme-toggle.tsx` — Dark/light mode via next-themes
 
 ## Coding Conventions
 
-- **No Zod** — Plain TypeScript interfaces in `src/lib/types.ts`
+- **No Zod** — Plain TypeScript interfaces in `src/lib/types.ts`. Input validation uses `ValidationError` class in `mcp-handler.ts` (not string-prefix matching).
 - **No xMCP framework** — MCP tools are plain functions in `mcp-handler.ts` calling `sukl-client.ts`
 - **Czech UI text** — All user-facing strings must be in Czech
-- **Tailwind CSS 4** — Theming via CSS variables (`--sukl-navy`, `--sukl-blue`, `--sukl-light-blue`) defined in `globals.css`
+- **Tailwind CSS 4** — Theming via CSS variables defined in `globals.css`:
+  - Brand: `--sukl-navy`, `--sukl-blue`, `--sukl-light-blue`, `--sukl-accent`
+  - Semantic: `--background`, `--foreground`, `--card`, `--border`, `--muted` (light/dark variants)
 - **framer-motion** — Used for animations; wrap heavy animated components with `next/dynamic`
 - **`@/*` path alias** — Maps to `./src/*` (configured in `tsconfig.json`)
+- **Dark/light mode** — `next-themes` with `.light`/`.dark` class on root element
 
 ## Data & SUKL APIs
 
@@ -81,6 +90,7 @@ The demo section uses a state machine orchestrator pattern:
 - **Build scripts** (`scripts/build-pharmacies.ts`, `scripts/build-reimbursements.ts`) — download and process data from SUKL. Handle WIN-1250 encoding.
 - **CI automation** (`.github/workflows/update-data.yml`) — monthly cron on 28th day updates bundled data.
 - **Document API** — PIL/SPC tools return download URLs from `https://prehledy.sukl.cz/dlp/v1/dokumenty-metadata/{kodSukl}`. PDF parsing via docling-mcp companion.
+- **API docs** — `docs/api-reference.md` (tool specs) and `docs/architecture.md` (Mermaid diagrams).
 
 ## Deployment
 

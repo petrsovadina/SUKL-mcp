@@ -206,6 +206,7 @@ graph TB
 
     subgraph "DataStore (in-memory)"
         Meds["medicines: MedicineDetail[]<br/>(68,248 items)"]
+        MedsByCode["medicinesByCode: Map&lt;string, MedicineDetail&gt;<br/>(68,248 entries, O(1) lookup by code)"]
         ATC["atcCodes: Map&lt;string, ATCInfo&gt;<br/>(6,907 entries, O(1) lookup)"]
         Pharm["pharmacies: Pharmacy[]<br/>(2,662 items)"]
         Reimb["reimbursements: Map&lt;string, ReimbursementInfo&gt;<br/>(8,480 entries, O(1) lookup)"]
@@ -213,6 +214,7 @@ graph TB
     end
 
     JSON --> M --> Meds
+    Meds --> MedsByCode
     JSON --> A --> ATC
     JSON --> P --> Pharm
     JSON --> R --> Reimb
@@ -220,6 +222,8 @@ graph TB
 ```
 
 **Cache politika:** Data se nacitaji pri prvnim pozadavku a cachuji 1 hodinu. Na serverless (Vercel) cache zije po dobu zivotnosti instance.
+
+**Normalizace kodu:** Vsechny SUKL kody jsou normalizovany funkci `normalizeCode()` (odstraneni vedoucich nul) konzistentne pri ukladani i vyhledavani v `medicinesByCode` i `reimbursements` Map.
 
 ---
 
@@ -325,7 +329,7 @@ graph LR
 
 ## Bezpecnost
 
-- **CSP header:** `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'none'`
+- **CSP header:** `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https:; frame-ancestors 'none'`
 - **X-Frame-Options:** DENY
 - **X-Content-Type-Options:** nosniff
 - **Referrer-Policy:** strict-origin-when-cross-origin
