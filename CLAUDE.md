@@ -30,13 +30,19 @@ Tests: 28 total (13 demo-handler, 12 mcp-handler, 3 integration). Config in `vit
 
 ## Architecture
 
-### Three entry points in one Next.js app
+### Entry points
 
-1. **Landing page** (`src/app/page.tsx`) — Client-side `"use client"` page composing 12 section components. Section order matters for scroll navigation anchors (`#quickstart`, `#tools`, `#demo`, etc.).
+1. **Landing page** (`src/app/page.tsx`) — Client-side `"use client"` page composing 13 section components. Section order matters for scroll navigation anchors (`#quickstart`, `#tools`, `#demo`, `#pricing`, etc.).
 
 2. **MCP endpoint** (`src/app/api/mcp/route.ts`) — JSON-RPC 2.0 over HTTP. Delegates to `src/lib/mcp-handler.ts` which implements 9 tools. Supports batch requests. CORS wildcard enabled via `vercel.json` headers + OPTIONS handler. URL rewrite: `/mcp` -> `/api/mcp`. Rate limit: 100 req/min per IP.
 
 3. **Demo API** (`src/app/api/demo/route.ts`) — Backend for the interactive demo chat. Uses regex/pattern matching (no LLM). Rate limited: 10 req/min per IP via in-memory Map.
+
+4. **Lead capture APIs** — Three form submission endpoints, all rate limited (5 req/min per IP):
+   - `src/app/api/register/route.ts` — Pro tier registration → Notion "Leads" DB
+   - `src/app/api/contact/route.ts` — Enterprise contact form → Notion "Enterprise" DB
+   - `src/app/api/newsletter/route.ts` — Newsletter signup → Notion "Newsletter" DB
+   - All use `src/lib/notion.ts` which wraps `@notionhq/client`
 
 ### Data flow
 
@@ -66,7 +72,8 @@ The demo section uses a state machine orchestrator pattern:
 
 ### Component layers
 
-- `src/components/sections/` — 12 landing page sections (stateless, visual)
+- `src/components/sections/` — 13 landing page sections (stateless, visual) incl. `pricing.tsx`
+- `src/components/forms/` — Modal forms: `register-modal.tsx` (Pro tier), `contact-modal.tsx` (Enterprise)
 - `src/components/demo/` — 10 demo chat components (guided tour + chat widget + message rendering)
 - `src/components/ui/` — 12 reusable animated components (shimmer-button, particles, typing-animation, etc.)
 - `src/components/icons/` — SVG icon components (single barrel file, tree-shakeable)
@@ -97,6 +104,17 @@ The demo section uses a state machine orchestrator pattern:
 - **Platform:** Vercel, region `fra1` (Frankfurt)
 - **Config:** `vercel.json` — rewrites `/mcp` to `/api/mcp`, CORS headers for MCP endpoint
 - **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options configured in `next.config.ts`
+
+## Environment Variables
+
+Required for lead capture / Notion CRM (see `.env.example`):
+
+- `NOTION_API_KEY` — Notion integration token
+- `NOTION_DB_LEADS` — Database ID for Pro registrations
+- `NOTION_DB_ENTERPRISE` — Database ID for Enterprise contacts
+- `NOTION_DB_NEWSLETTER` — Database ID for newsletter subscribers
+
+Landing page and MCP endpoint work without these (forms will return 500).
 
 ## Known Constraints
 
