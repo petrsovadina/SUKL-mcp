@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createLead } from "@/lib/notion";
+import { sendRegistrationConfirmation } from "@/lib/resend";
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 5;
@@ -50,11 +51,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { email, company, useCase } = body as {
+  const { email, company, useCase, name, useCaseDetail, gdprConsentAt } = body as {
     email?: string;
     company?: string;
     useCase?: string;
+    name?: string;
+    useCaseDetail?: string;
+    gdprConsentAt?: string;
   };
+
+  if (
+    typeof name !== "string" ||
+    name.trim().length < 2 ||
+    name.length > 200
+  ) {
+    return NextResponse.json(
+      { error: "Zadejte své jméno." },
+      { status: 400 }
+    );
+  }
 
   if (
     typeof email !== "string" ||
@@ -78,16 +93,36 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (typeof gdprConsentAt !== "string" || !gdprConsentAt) {
+    return NextResponse.json(
+      { error: "Souhlas se zpracováním údajů je povinný." },
+      { status: 400 }
+    );
+  }
+
   const selectedUseCase = VALID_USE_CASES.includes(useCase as string)
     ? (useCase as string)
     : "Jiné";
 
+  const trimmedUseCaseDetail =
+    typeof useCaseDetail === "string" ? useCaseDetail.trim().slice(0, 500) : undefined;
+
   try {
     await createLead({
+      name: name.trim(),
       email: email.trim(),
       company: company.trim(),
       useCase: selectedUseCase,
+      useCaseDetail: trimmedUseCaseDetail || undefined,
+      gdprConsentAt,
     });
+
+    // Send confirmation email (non-blocking)
+    try {
+      await sendRegistrationConfirmation(email.trim(), name.trim());
+    } catch (emailError) {
+      console.error("Resend email error:", emailError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
