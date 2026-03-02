@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createEnterpriseContact } from "@/lib/notion";
+import { sendEnterpriseNotification } from "@/lib/resend";
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 5;
@@ -44,13 +45,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { email, company, phone, companySize, message } = body as {
+  const { email, company, phone, companySize, message, name, gdprConsentAt } = body as {
     email?: string;
     company?: string;
     phone?: string;
     companySize?: string;
     message?: string;
+    name?: string;
+    gdprConsentAt?: string;
   };
+
+  if (
+    typeof name !== "string" ||
+    name.trim().length < 2 ||
+    name.length > 200
+  ) {
+    return NextResponse.json(
+      { error: "Zadejte své jméno." },
+      { status: 400 }
+    );
+  }
 
   if (
     typeof email !== "string" ||
@@ -85,18 +99,40 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (typeof gdprConsentAt !== "string" || !gdprConsentAt) {
+    return NextResponse.json(
+      { error: "Souhlas se zpracováním údajů je povinný." },
+      { status: 400 }
+    );
+  }
+
   const selectedSize = VALID_SIZES.includes(companySize as string)
     ? (companySize as string)
     : "1–10";
 
   try {
     await createEnterpriseContact({
+      name: name.trim(),
       email: email.trim(),
       company: company.trim(),
       phone: typeof phone === "string" ? phone.trim() : undefined,
       companySize: selectedSize,
       message: message.trim(),
+      gdprConsentAt,
     });
+
+    // Send notification email (non-blocking)
+    try {
+      await sendEnterpriseNotification({
+        name: name.trim(),
+        email: email.trim(),
+        company: company.trim(),
+        companySize: selectedSize,
+        message: message.trim(),
+      });
+    } catch (emailError) {
+      console.error("Resend email error:", emailError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

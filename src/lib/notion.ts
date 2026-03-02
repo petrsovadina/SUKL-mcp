@@ -17,6 +17,9 @@ export async function createLead(data: {
   email: string;
   company: string;
   useCase: string;
+  name: string;
+  useCaseDetail?: string;
+  gdprConsentAt: string;
 }) {
   return notion.pages.create({
     parent: { database_id: DB_LEADS },
@@ -24,6 +27,11 @@ export async function createLead(data: {
       Email: { email: data.email },
       Firma: { title: [{ text: { content: data.company } }] },
       "Use Case": { select: { name: data.useCase } },
+      Jméno: { rich_text: [{ text: { content: data.name } }] },
+      ...(data.useCaseDetail
+        ? { "Use Case Detail": { rich_text: [{ text: { content: data.useCaseDetail } }] } }
+        : {}),
+      "GDPR Souhlas": { date: { start: data.gdprConsentAt } },
       Datum: { date: { start: new Date().toISOString().split("T")[0] } },
       Status: { select: { name: "Nový" } },
     },
@@ -36,15 +44,19 @@ export async function createEnterpriseContact(data: {
   phone?: string;
   companySize: string;
   message: string;
+  name: string;
+  gdprConsentAt: string;
 }) {
   return notion.pages.create({
     parent: { database_id: DB_ENTERPRISE },
     properties: {
       Email: { email: data.email },
       Firma: { title: [{ text: { content: data.company } }] },
+      Jméno: { rich_text: [{ text: { content: data.name } }] },
       Telefon: { phone_number: data.phone || null },
       Velikost: { select: { name: data.companySize } },
       Zpráva: { rich_text: [{ text: { content: data.message } }] },
+      "GDPR Souhlas": { date: { start: data.gdprConsentAt } },
       Datum: { date: { start: new Date().toISOString().split("T")[0] } },
     },
   });

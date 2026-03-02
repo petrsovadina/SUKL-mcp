@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, CheckCircle } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 const COMPANY_SIZES = ["1–10", "11–50", "51–200", "200+"];
 
@@ -12,24 +13,41 @@ interface ContactModalProps {
 }
 
 export function ContactModal({ isOpen, onClose }: ContactModalProps) {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
   const [companySize, setCompanySize] = useState(COMPANY_SIZES[0]);
   const [message, setMessage] = useState("");
+  const [gdprConsent, setGdprConsent] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      trackEvent("form_open", { form: "contact" });
+    }
+  }, [isOpen]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("loading");
     setErrorMsg("");
+    trackEvent("form_submit", { form: "contact" });
 
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, company, phone, companySize, message }),
+        body: JSON.stringify({
+          name,
+          email,
+          company,
+          phone,
+          companySize,
+          message,
+          gdprConsentAt: new Date().toISOString(),
+        }),
       });
 
       const data = await res.json();
@@ -37,26 +55,34 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
       if (!res.ok) {
         setErrorMsg(data.error || "Něco se pokazilo.");
         setStatus("error");
+        trackEvent("form_error", { form: "contact" });
         return;
       }
 
       setStatus("success");
+      trackEvent("form_success", { form: "contact" });
     } catch {
       setErrorMsg("Nepodařilo se odeslat. Zkuste to znovu.");
       setStatus("error");
+      trackEvent("form_error", { form: "contact" });
     }
   }
 
   function handleClose() {
     setStatus("idle");
+    setName("");
     setEmail("");
     setCompany("");
     setPhone("");
     setCompanySize(COMPANY_SIZES[0]);
     setMessage("");
+    setGdprConsent(false);
     setErrorMsg("");
     onClose();
   }
+
+  const inputClass =
+    "w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink/50 focus:border-pink transition-colors";
 
   return (
     <AnimatePresence>
@@ -116,6 +142,21 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
+                    <label htmlFor="contact-name" className="block text-sm font-medium text-foreground mb-1">
+                      Jméno *
+                    </label>
+                    <input
+                      id="contact-name"
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Jan Novák"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
                     <label htmlFor="contact-email" className="block text-sm font-medium text-foreground mb-1">
                       Email *
                     </label>
@@ -126,7 +167,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="jan@firma.cz"
-                      className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink/50 focus:border-pink transition-colors"
+                      className={inputClass}
                     />
                   </div>
 
@@ -141,7 +182,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
                       placeholder="Nemocnice Na Homolce"
-                      className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink/50 focus:border-pink transition-colors"
+                      className={inputClass}
                     />
                   </div>
 
@@ -156,7 +197,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="+420..."
-                        className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink/50 focus:border-pink transition-colors"
+                        className={inputClass}
                       />
                     </div>
 
@@ -168,7 +209,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                         id="contact-size"
                         value={companySize}
                         onChange={(e) => setCompanySize(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-pink/50 focus:border-pink transition-colors"
+                        className={inputClass}
                       >
                         {COMPANY_SIZES.map((s) => (
                           <option key={s} value={s}>{s} zaměstnanců</option>
@@ -188,8 +229,25 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder="Potřebujeme integrovat data o lécích do našeho klinického systému..."
-                      className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink/50 focus:border-pink transition-colors resize-none"
+                      className={`${inputClass} resize-none`}
                     />
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="contact-gdpr"
+                      type="checkbox"
+                      checked={gdprConsent}
+                      onChange={(e) => setGdprConsent(e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded border-border text-pink focus:ring-pink/50"
+                    />
+                    <label htmlFor="contact-gdpr" className="text-sm text-muted-foreground">
+                      Souhlasím se{" "}
+                      <a href="/privacy" className="text-pink hover:underline">
+                        zpracováním osobních údajů
+                      </a>{" "}
+                      za účelem poskytnutí služby. *
+                    </label>
                   </div>
 
                   {errorMsg && (
@@ -198,7 +256,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
 
                   <button
                     type="submit"
-                    disabled={status === "loading"}
+                    disabled={status === "loading" || !gdprConsent}
                     className="w-full py-3 rounded-lg bg-pink text-white font-medium hover:bg-pink/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {status === "loading" ? (

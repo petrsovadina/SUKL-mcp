@@ -39,10 +39,11 @@ Tests: 28 total (13 demo-handler, 12 mcp-handler, 3 integration). Config in `vit
 3. **Demo API** (`src/app/api/demo/route.ts`) — Backend for the interactive demo chat. Uses regex/pattern matching (no LLM). Rate limited: 10 req/min per IP via in-memory Map.
 
 4. **Lead capture APIs** — Three form submission endpoints, all rate limited (5 req/min per IP):
-   - `src/app/api/register/route.ts` — Pro tier registration → Notion "Leads" DB
-   - `src/app/api/contact/route.ts` — Enterprise contact form → Notion "Enterprise" DB
+   - `src/app/api/register/route.ts` — Pro tier registration → Notion "Leads" DB + Resend confirmation email
+   - `src/app/api/contact/route.ts` — Enterprise contact form → Notion "Enterprise" DB + Resend notification email
    - `src/app/api/newsletter/route.ts` — Newsletter signup → Notion "Newsletter" DB
-   - All use `src/lib/notion.ts` which wraps `@notionhq/client`
+   - All use `src/lib/notion.ts` (Notion CRM) and register/contact also use `src/lib/resend.ts` (email notifications)
+   - Resend email failures are non-blocking (caught silently) — form submission succeeds even if email fails
 
 ### Data flow
 
@@ -73,7 +74,7 @@ The demo section uses a state machine orchestrator pattern:
 ### Component layers
 
 - `src/components/sections/` — 13 landing page sections (stateless, visual) incl. `pricing.tsx`
-- `src/components/forms/` — Modal forms: `register-modal.tsx` (Pro tier), `contact-modal.tsx` (Enterprise)
+- `src/components/forms/` — Modal forms: `register-modal.tsx` (Pro tier), `contact-modal.tsx` (Enterprise). Both include GDPR consent, name field, and analytics tracking.
 - `src/components/demo/` — 10 demo chat components (guided tour + chat widget + message rendering)
 - `src/components/ui/` — 12 reusable animated components (shimmer-button, particles, typing-animation, etc.)
 - `src/components/icons/` — SVG icon components (single barrel file, tree-shakeable)
@@ -114,7 +115,20 @@ Required for lead capture / Notion CRM (see `.env.example`):
 - `NOTION_DB_ENTERPRISE` — Database ID for Enterprise contacts
 - `NOTION_DB_NEWSLETTER` — Database ID for newsletter subscribers
 
-Landing page and MCP endpoint work without these (forms will return 500).
+Optional for email notifications (via Resend):
+
+- `RESEND_API_KEY` — Resend API key
+- `RESEND_FROM_EMAIL` — Verified sender address (default: `noreply@sukl-mcp.vercel.app`)
+- `RESEND_OWNER_EMAIL` — Recipient for enterprise inquiry notifications
+
+Landing page and MCP endpoint work without these (forms will return 500 without Notion keys; emails silently skip without Resend keys).
+
+## Analytics
+
+- **Vercel Analytics** + **Umami** — both initialized in `src/app/layout.tsx`
+- `src/lib/analytics.ts` — client-side `trackEvent()` utility that fires to both providers
+- Events: `form_open`, `form_submit`, `form_success`, `form_error`, `cta_click`, `pricing_cta`
+- CTA section tracks clicks on Smithery install, Pro trial, and GitHub buttons
 
 ## Known Constraints
 

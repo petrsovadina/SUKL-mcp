@@ -22,10 +22,12 @@ SUKL MCP Server implementuje [Model Context Protocol](https://modelcontextprotoc
 - **Fuzzy vyhledávání** pomocí Fuse.js s tolerancí překlepů
 - **Landing page** s 13 sekcemi a interaktivním demo
 - **Pricing** — 3 cenové úrovně (Free/Pro/Enterprise) s registračními formuláři
-- **Lead capture** — formuláře pro registraci, enterprise kontakt a newsletter → Notion CRM
+- **Lead capture** — formuláře pro registraci, enterprise kontakt a newsletter → Notion CRM + Resend email notifikace
 - **Guided demo onboarding** — 3-krokový interaktivní tour (hledání → detail → ATC)
 - **MCP Streamable HTTP** endpoint (JSON-RPC 2.0) na `/mcp`
 - **Demo chat** bez LLM — regex/pattern matching pro ukázku tool calls
+- **GDPR souhlas** — povinný checkbox ve všech formulářích s timestampem
+- **Analytics** — Vercel Analytics + Umami tracking konverzního funnelu
 - **Dark/Light mode** s plně responzivním designem
 - **Automatická aktualizace dat** — CI workflow (měsíční cron)
 
@@ -146,6 +148,8 @@ SUKL-mcp/
 │       ├── mcp-handler.ts        # JSON-RPC handler (9 tools)
 │       ├── demo-handler.ts       # Intent parser (regex)
 │       ├── notion.ts             # Notion CRM client (leads, enterprise, newsletter)
+│       ├── resend.ts             # Resend email client (potvrzení registrace, enterprise notifikace)
+│       ├── analytics.ts          # Event tracking (Vercel Analytics + Umami)
 │       └── utils.ts              # cn() helper
 ├── data/
 │   └── bundled-data.json         # 10.4 MB (68k léků, 2662 lékáren, 8480 úhrad, 6907 ATC)
@@ -174,6 +178,8 @@ SUKL-mcp/
 - **next-themes** — Dark/light mode
 - **Radix UI** — Accordion, **lucide-react** — ikony
 - **@notionhq/client** — CRM backend pro lead capture formuláře
+- **Resend** — Transakční emaily (potvrzení registrace, enterprise notifikace)
+- **@vercel/analytics** — Konverzní tracking
 - **Vitest 4** — Unit a integrační testy (28)
 - **Vercel** — Deployment (region `fra1`)
 
@@ -202,8 +208,11 @@ Nástroje `get-pil-content` a `get-spc-content` vracejí URL ke stažení PDF do
 | `NOTION_DB_LEADS` | DB ID pro Pro registrace | Pro formuláře |
 | `NOTION_DB_ENTERPRISE` | DB ID pro Enterprise kontakty | Pro formuláře |
 | `NOTION_DB_NEWSLETTER` | DB ID pro newsletter odběratele | Pro formuláře |
+| `RESEND_API_KEY` | Resend API klíč | Pro emaily |
+| `RESEND_FROM_EMAIL` | Ověřená odesílací adresa | Pro emaily |
+| `RESEND_OWNER_EMAIL` | Email pro enterprise notifikace | Pro emaily |
 
-Viz `.env.example` pro šablonu. Notion integrace vyžaduje sdílení všech 3 databází s integrací.
+Viz `.env.example` pro šablonu. Notion integrace vyžaduje sdílení všech 3 databází s integrací. Resend emaily jsou volitelné — formuláře fungují i bez nich.
 
 ---
 
@@ -222,7 +231,7 @@ Projekt je nasazený na Vercel:
 - Build command: `next build`
 - `/mcp` → rewrite na `/api/mcp`
 - CORS headers pro MCP endpoint (Access-Control-Allow-Origin: *)
-- Environment variables: `NOTION_API_KEY`, `NOTION_DB_LEADS`, `NOTION_DB_ENTERPRISE`, `NOTION_DB_NEWSLETTER`
+- Environment variables: `NOTION_API_KEY`, `NOTION_DB_*`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_OWNER_EMAIL`
 
 ---
 

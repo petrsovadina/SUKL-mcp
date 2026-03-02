@@ -1,12 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Github, Star, Check, Rocket } from "lucide-react";
+import { ArrowRight, Github, Star, Check, Rocket, Zap } from "lucide-react";
 import Link from "next/link";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
-import { MovingBorder } from "@/components/ui/moving-border";
+import { RegisterModal } from "@/components/forms/register-modal";
+import { trackEvent } from "@/lib/analytics";
 
 export function CTA() {
+  const [registerOpen, setRegisterOpen] = useState(false);
+
   return (
     <section className="py-24 relative overflow-hidden">
       <div className="container mx-auto px-4 text-center relative z-10">
@@ -59,8 +63,21 @@ export function CTA() {
             href="https://smithery.ai/server/@petrsovadina/sukl-mcp"
             className="text-base"
             shimmerColor="#2b6cb0"
+            onClick={() => trackEvent("cta_click", { target: "smithery" })}
           >
             <Rocket className="w-4 h-4" /> Nainstalovat zdarma
+            <ArrowRight className="w-4 h-4" />
+          </ShimmerButton>
+
+          <ShimmerButton
+            className="text-base"
+            shimmerColor="#e53e7a"
+            onClick={() => {
+              trackEvent("cta_click", { target: "pro_trial" });
+              setRegisterOpen(true);
+            }}
+          >
+            <Zap className="w-4 h-4" /> Vyzkoušet Pro zdarma
             <ArrowRight className="w-4 h-4" />
           </ShimmerButton>
 
@@ -68,6 +85,7 @@ export function CTA() {
             href="https://github.com/petrsovadina/SUKL-mcp"
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackEvent("cta_click", { target: "github" })}
             className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-border hover:border-yellow-400/50 hover:bg-yellow-400/5 transition-all group text-foreground font-medium"
           >
             <Star className="w-4 h-4 text-yellow-400 group-hover:fill-yellow-400 transition-all" />
@@ -79,6 +97,9 @@ export function CTA() {
       {/* Background decoration */}
       <div className="absolute inset-0 bg-gradient-to-t from-pink/5 via-transparent to-transparent pointer-events-none" />
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-pink/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Register Modal */}
+      <RegisterModal isOpen={registerOpen} onClose={() => setRegisterOpen(false)} />
     </section>
   );
 }

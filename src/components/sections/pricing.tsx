@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Check, ArrowRight, Sparkles, Building2 } from "lucide-react";
 import { RegisterModal } from "@/components/forms/register-modal";
 import { ContactModal } from "@/components/forms/contact-modal";
+import { trackEvent } from "@/lib/analytics";
 
 interface PricingTier {
   name: string;
@@ -75,6 +76,7 @@ export function Pricing() {
   const [contactOpen, setContactOpen] = useState(false);
 
   function handleAction(action: PricingTier["action"]) {
+    trackEvent("pricing_cta", { tier: action });
     switch (action) {
       case "free":
         document.getElementById("quickstart")?.scrollIntoView({ behavior: "smooth" });
