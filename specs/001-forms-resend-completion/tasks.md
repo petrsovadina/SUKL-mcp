@@ -105,7 +105,7 @@
 - [x] T016 Vytvořit test soubor tests/lib/newsletter-route.test.ts — 8 testů
 - [x] T017 Spustit `npm run build` — PASS
 - [x] T018 Spustit `npm test` — 36 testů PASS (28 existujících + 8 nových)
-- [ ] T019 Manuální end-to-end test: odeslat Register, Contact a Newsletter formuláře na localhost:3000
+- [x] T019 Manuální end-to-end test: Register, Contact, Newsletter — všechny PASS, dedup funguje
 - [x] T020 Aktualizovat CLAUDE.md — newsletter Resend integrace, počet testů 36
 
 ---

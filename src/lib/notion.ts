@@ -64,15 +64,23 @@ export async function createEnterpriseContact(data: {
 
 export async function checkNewsletterDuplicate(email: string): Promise<boolean> {
   try {
-    const response = await notion.dataSources.query({
-      data_source_id: DB_NEWSLETTER,
-      filter: {
-        property: "Email",
-        email: { equals: email },
+    // Notion client v5 dataSources.query uses a different endpoint than /databases/{id}/query.
+    // Use direct REST call for database query compatibility.
+    const res = await fetch(`https://api.notion.com/v1/databases/${DB_NEWSLETTER}/query`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.NOTION_API_KEY}`,
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
       },
-      page_size: 1,
+      body: JSON.stringify({
+        filter: { property: "Email", email: { equals: email } },
+        page_size: 1,
+      }),
     });
-    return response.results.length > 0;
+    if (!res.ok) throw new Error(`Notion query failed: ${res.status}`);
+    const data = await res.json();
+    return data.results.length > 0;
   } catch (error) {
     console.error("Newsletter duplicate check error:", error);
     return false;
