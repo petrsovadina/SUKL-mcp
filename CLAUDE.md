@@ -26,7 +26,7 @@ Run tests matching a name: `npx vitest run -t "search-medicine"`
 
 Manual data update: `npx tsx scripts/build-pharmacies.ts` and `npx tsx scripts/build-reimbursements.ts` (downloads from SUKL, handles WIN-1250 encoding).
 
-Tests: 28 total (13 demo-handler, 12 mcp-handler, 3 integration). Config in `vitest.config.ts`, test files in `tests/`.
+Tests: 36 total (13 demo-handler, 12 mcp-handler, 8 newsletter-route, 3 integration). Config in `vitest.config.ts`, test files in `tests/`.
 
 ## Architecture
 
@@ -41,8 +41,8 @@ Tests: 28 total (13 demo-handler, 12 mcp-handler, 3 integration). Config in `vit
 4. **Lead capture APIs** — Three form submission endpoints, all rate limited (5 req/min per IP):
    - `src/app/api/register/route.ts` — Pro tier registration → Notion "Leads" DB + Resend confirmation email
    - `src/app/api/contact/route.ts` — Enterprise contact form → Notion "Enterprise" DB + Resend notification email
-   - `src/app/api/newsletter/route.ts` — Newsletter signup → Notion "Newsletter" DB
-   - All use `src/lib/notion.ts` (Notion CRM) and register/contact also use `src/lib/resend.ts` (email notifications)
+   - `src/app/api/newsletter/route.ts` — Newsletter signup → Notion "Newsletter" DB + Resend confirmation email + duplicate detection
+   - All use `src/lib/notion.ts` (Notion CRM) and `src/lib/resend.ts` (email notifications)
    - Resend email failures are non-blocking (caught silently) — form submission succeeds even if email fails
 
 ### Data flow
@@ -135,3 +135,10 @@ Landing page and MCP endpoint work without these (forms will return 500 without 
 - PIL/SPC returns download URL from SUKL API (prehledy.sukl.cz) — PDF parsing via docling-mcp companion
 - In-memory rate limiting resets on serverless cold start
 - Cold start may be slow due to 10.4 MB JSON lazy-loading
+
+## Active Technologies
+- TypeScript 5+ / Next.js 16.1.6 / React 19.2.3 + `resend` (email), `@notionhq/client` (CRM), `framer-motion` (animace), `lucide-react` (ikony) (001-forms-resend-completion)
+- Notion databases (3x: Leads, Enterprise, Newsletter) — external SaaS (001-forms-resend-completion)
+
+## Recent Changes
+- 001-forms-resend-completion: Added TypeScript 5+ / Next.js 16.1.6 / React 19.2.3 + `resend` (email), `@notionhq/client` (CRM), `framer-motion` (animace), `lucide-react` (ikony)

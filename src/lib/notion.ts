@@ -62,12 +62,30 @@ export async function createEnterpriseContact(data: {
   });
 }
 
-export async function createNewsletterSubscriber(email: string) {
+export async function checkNewsletterDuplicate(email: string): Promise<boolean> {
+  try {
+    const response = await notion.dataSources.query({
+      data_source_id: DB_NEWSLETTER,
+      filter: {
+        property: "Email",
+        email: { equals: email },
+      },
+      page_size: 1,
+    });
+    return response.results.length > 0;
+  } catch (error) {
+    console.error("Newsletter duplicate check error:", error);
+    return false;
+  }
+}
+
+export async function createNewsletterSubscriber(email: string, gdprConsentAt: string) {
   return notion.pages.create({
     parent: { database_id: DB_NEWSLETTER },
     properties: {
       Name: { title: [{ text: { content: email } }] },
       Email: { email },
+      "GDPR Souhlas": { date: { start: gdprConsentAt } },
       Datum: { date: { start: new Date().toISOString().split("T")[0] } },
     },
   });

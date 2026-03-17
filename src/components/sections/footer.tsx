@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Github, Linkedin, Mail, Phone, MapPin, ArrowRight, Loader2, CheckCircle } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 const DATA = {
   name: "Petr Sovadina",
@@ -155,18 +156,24 @@ export function Footer() {
 
 function NewsletterForm() {
   const [email, setEmail] = useState("");
+  const [gdprConsent, setGdprConsent] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("loading");
+    setErrorMsg("");
+    trackEvent("form_submit", { form: "newsletter" });
 
     try {
       const res = await fetch("/api/newsletter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          email,
+          gdprConsentAt: new Date().toISOString(),
+        }),
       });
 
       const data = await res.json();
@@ -174,14 +181,17 @@ function NewsletterForm() {
       if (!res.ok) {
         setErrorMsg(data.error || "Něco se pokazilo.");
         setStatus("error");
+        trackEvent("form_error", { form: "newsletter" });
         return;
       }
 
       setStatus("success");
       setEmail("");
+      trackEvent("form_success", { form: "newsletter" });
     } catch {
       setErrorMsg("Nepodařilo se přihlásit. Zkuste to znovu.");
       setStatus("error");
+      trackEvent("form_error", { form: "newsletter" });
     }
   }
 
@@ -203,29 +213,46 @@ function NewsletterForm() {
         <p className="text-sm text-muted-foreground mb-4">
           Nové funkce, aktualizace dat a tipy pro integraci. Maximálně 2x měsíčně.
         </p>
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => { setEmail(e.target.value); setStatus("idle"); }}
-            placeholder="vas@email.cz"
-            className="flex-1 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink/50 focus:border-pink transition-colors text-sm"
-          />
-          <button
-            type="submit"
-            disabled={status === "loading"}
-            className="px-4 py-2.5 rounded-lg bg-pink text-white font-medium hover:bg-pink/90 transition-colors disabled:opacity-50 flex items-center gap-1.5 text-sm shrink-0"
-          >
-            {status === "loading" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                Odebírat
-                <ArrowRight className="w-3.5 h-3.5" />
-              </>
-            )}
-          </button>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setStatus("idle"); }}
+              placeholder="vas@email.cz"
+              className="flex-1 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink/50 focus:border-pink transition-colors text-sm"
+            />
+            <button
+              type="submit"
+              disabled={status === "loading" || !gdprConsent}
+              className="px-4 py-2.5 rounded-lg bg-pink text-white font-medium hover:bg-pink/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm shrink-0"
+            >
+              {status === "loading" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  Odebírat
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
+          </div>
+          <label className="flex items-start gap-2 text-left cursor-pointer">
+            <input
+              type="checkbox"
+              checked={gdprConsent}
+              onChange={(e) => setGdprConsent(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-border text-pink focus:ring-pink/50 shrink-0"
+            />
+            <span className="text-xs text-muted-foreground">
+              Souhlasím se{" "}
+              <a href="/privacy" className="text-pink hover:underline">
+                zpracováním osobních údajů
+              </a>{" "}
+              za účelem zasílání novinek.
+            </span>
+          </label>
         </form>
         {status === "error" && (
           <p className="text-xs text-red-400 mt-2">{errorMsg}</p>

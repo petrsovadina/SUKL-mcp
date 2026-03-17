@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createNewsletterSubscriber } from "@/lib/notion";
+import { createNewsletterSubscriber, checkNewsletterDuplicate } from "@/lib/notion";
+import { sendNewsletterConfirmation } from "@/lib/resend";
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 5;
@@ -42,7 +43,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { email } = body as { email?: string };
+  const { email, gdprConsentAt } = body as {
+    email?: string;
+    gdprConsentAt?: string;
+  };
 
   if (
     typeof email !== "string" ||
@@ -55,8 +59,34 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (typeof gdprConsentAt !== "string" || !gdprConsentAt) {
+    return NextResponse.json(
+      { error: "Souhlas se zpracováním údajů je povinný." },
+      { status: 400 }
+    );
+  }
+
+  const trimmedEmail = email.trim();
+
+  // Duplicate check — if it fails, proceed anyway (don't lose subscriber)
+  const isDuplicate = await checkNewsletterDuplicate(trimmedEmail);
+  if (isDuplicate) {
+    return NextResponse.json({
+      success: true,
+      message: "Tento email je již přihlášen k odběru.",
+    });
+  }
+
   try {
-    await createNewsletterSubscriber(email.trim());
+    await createNewsletterSubscriber(trimmedEmail, gdprConsentAt);
+
+    // Send confirmation email (non-blocking)
+    try {
+      await sendNewsletterConfirmation(trimmedEmail);
+    } catch (emailError) {
+      console.error("Resend email error:", emailError);
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Newsletter API error:", error);
