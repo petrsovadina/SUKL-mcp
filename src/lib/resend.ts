@@ -34,17 +34,17 @@ export async function sendRegistrationConfirmation(to: string, name: string) {
   return getResend().emails.send({
     from: FROM_EMAIL,
     to,
-    subject: "SÚKL MCP Pro — Vaše registrace byla přijata",
-    html: emailWrapper("Registrace přijata", `
-      <p>Děkujeme za registraci, <strong>${name}</strong>!</p>
-      <p>Vaše žádost o Pro API klíč byla přijata. Ozveme se vám s přístupovými údaji.</p>
-      <p><strong>Co vás čeká:</strong></p>
+    subject: "SÚKL MCP — Jste na seznamu pro early access",
+    html: emailWrapper("Jste na seznamu!", `
+      <p>Děkujeme za zájem, <strong>${name}</strong>!</p>
+      <p>Zapsali jsme vás k early access. Jako první se dozvíte o nových funkcích a plánech SÚKL MCP.</p>
+      <p><strong>Co připravujeme:</strong></p>
       <ul style="padding-left: 20px; color: #374151;">
-        <li>14denní bezplatný trial</li>
-        <li>1 000 požadavků / min</li>
+        <li>Vyšší limity požadavků</li>
         <li>API klíč + dashboard</li>
+        <li>Prioritní podpora</li>
       </ul>
-      <p>Pokud máte mezitím jakékoli dotazy, neváhejte nás kontaktovat.</p>
+      <p>Mezitím můžete používat open source verzi bez omezení.</p>
       <p style="margin-top: 24px;">S pozdravem,<br><strong>SÚKL MCP tým</strong></p>
     `),
   });

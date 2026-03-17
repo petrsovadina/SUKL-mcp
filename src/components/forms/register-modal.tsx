@@ -122,10 +122,10 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
               <div className="text-center py-8">
                 <CheckCircle className="w-16 h-16 text-teal mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-foreground mb-2">
-                  Registrace odeslána!
+                  Jste na seznamu!
                 </h3>
                 <p className="text-muted-foreground mb-6">
-                  Ozveme se vám s přístupovými údaji k Pro trialu na {email}.
+                  Dáme vám vědět jako prvním, až spustíme nové funkce. Kontaktujeme vás na {email}.
                 </p>
                 <button
                   onClick={handleClose}
@@ -137,10 +137,10 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
             ) : (
               <>
                 <h3 className="text-xl font-semibold text-foreground mb-1">
-                  Získat Pro API klíč
+                  Získat early access
                 </h3>
                 <p className="text-muted-foreground text-sm mb-6">
-                  14 dní zdarma. Bez platební karty.
+                  Připravujeme Pro plán. Zanechte kontakt a budete první, kdo se dozví.
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -261,7 +261,7 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                         Odesílám...
                       </>
                     ) : (
-                      "Získat 14denní trial"
+                      "Zapsat se k early access"
                     )}
                   </button>
                 </form>

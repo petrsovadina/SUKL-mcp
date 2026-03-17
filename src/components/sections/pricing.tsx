@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, ArrowRight, Sparkles, Building2 } from "lucide-react";
+import { Check, ArrowRight, Sparkles, Building2, Bell, Rocket } from "lucide-react";
 import { RegisterModal } from "@/components/forms/register-modal";
-import { ContactModal } from "@/components/forms/contact-modal";
 import { trackEvent } from "@/lib/analytics";
 
 interface PricingTier {
@@ -16,42 +15,44 @@ interface PricingTier {
   cta: string;
   highlighted?: boolean;
   badge?: string;
-  action: "free" | "register" | "contact";
+  action: "free" | "early-access" | "notify";
+  comingSoon?: boolean;
 }
 
 const tiers: PricingTier[] = [
   {
-    name: "Free",
-    price: "0 Kč",
+    name: "Open Source",
+    price: "Zdarma",
     period: "navždy",
-    description: "Pro osobní projekty a experimentování",
+    description: "Plný přístup k celé databázi SÚKL — bez omezení",
     features: [
       "9 MCP nástrojů",
-      "100 požadavků / min",
+      "68 000+ léčiv v reálném čase",
       "Měsíční aktualizace dat",
       "Komunitní podpora",
-      "Open source",
+      "MIT licence — open source",
     ],
     cta: "Začít zdarma",
     action: "free",
   },
   {
     name: "Pro",
-    price: "2 490 Kč",
-    period: "/ měsíc",
+    price: "Připravujeme",
+    period: "",
     description: "Pro firmy a produkční nasazení",
     features: [
-      "Vše z Free",
-      "1 000 požadavků / min",
+      "Vše z Open Source",
+      "Vyšší limity požadavků",
       "API klíč + dashboard",
       "Týdenní aktualizace dat",
-      "Email podpora (48h)",
-      "SLA 99,5% uptime",
+      "Prioritní podpora",
+      "SLA garance",
     ],
-    cta: "Získat API klíč",
+    cta: "Získat early access",
     highlighted: true,
-    badge: "Nejoblíbenější",
-    action: "register",
+    badge: "Brzy",
+    action: "early-access",
+    comingSoon: true,
   },
   {
     name: "Enterprise",
@@ -63,17 +64,17 @@ const tiers: PricingTier[] = [
       "Neomezené požadavky",
       "Denní aktualizace dat",
       "Webhooky pro monitoring",
-      "Dedikovaná podpora (4h)",
-      "SLA 99,9% + custom SLA",
+      "Dedikovaná podpora",
+      "Custom SLA",
     ],
-    cta: "Kontaktujte nás",
-    action: "contact",
+    cta: "Chci vědět více",
+    action: "notify",
+    comingSoon: true,
   },
 ];
 
 export function Pricing() {
-  const [registerOpen, setRegisterOpen] = useState(false);
-  const [contactOpen, setContactOpen] = useState(false);
+  const [earlyAccessOpen, setEarlyAccessOpen] = useState(false);
 
   function handleAction(action: PricingTier["action"]) {
     trackEvent("pricing_cta", { tier: action });
@@ -81,11 +82,9 @@ export function Pricing() {
       case "free":
         document.getElementById("quickstart")?.scrollIntoView({ behavior: "smooth" });
         break;
-      case "register":
-        setRegisterOpen(true);
-        break;
-      case "contact":
-        setContactOpen(true);
+      case "early-access":
+      case "notify":
+        setEarlyAccessOpen(true);
         break;
     }
   }
@@ -102,10 +101,11 @@ export function Pricing() {
           className="text-center mb-16"
         >
           <h2 className="font-[family-name:var(--font-mono-display)] text-3xl md:text-4xl text-foreground mb-4 tracking-tight">
-            Cenové plány
+            Začněte zdarma, rostěte s námi
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Začněte zdarma, škálujte podle potřeby
+            Projekt je v rané fázi — open source verze je plně funkční.
+            Placené plány připravujeme pro ty, kdo chtějí víc.
           </p>
         </motion.div>
 
@@ -122,7 +122,7 @@ export function Pricing() {
                 tier.highlighted
                   ? "bg-card border-2 border-pink shadow-lg shadow-pink/10 scale-[1.02]"
                   : "bg-card border border-border"
-              }`}
+              } ${tier.comingSoon ? "opacity-90" : ""}`}
             >
               {/* Badge */}
               {tier.badge && (
@@ -137,8 +137,10 @@ export function Pricing() {
               {/* Header */}
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-3">
-                  {tier.action === "contact" ? (
+                  {tier.action === "notify" ? (
                     <Building2 className="w-5 h-5 text-pixel-blue" />
+                  ) : tier.action === "free" ? (
+                    <Rocket className="w-5 h-5 text-teal" />
                   ) : null}
                   <h3 className="text-lg font-semibold text-foreground">{tier.name}</h3>
                 </div>
@@ -159,8 +161,12 @@ export function Pricing() {
               <ul className="space-y-3 mb-8 flex-1">
                 {tier.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2 text-sm">
-                    <Check className={`w-4 h-4 mt-0.5 shrink-0 ${tier.highlighted ? "text-pink" : "text-teal"}`} />
-                    <span className="text-foreground">{feature}</span>
+                    <Check className={`w-4 h-4 mt-0.5 shrink-0 ${
+                      tier.comingSoon ? "text-muted-foreground" : tier.highlighted ? "text-pink" : "text-teal"
+                    }`} />
+                    <span className={tier.comingSoon ? "text-muted-foreground" : "text-foreground"}>
+                      {feature}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -171,11 +177,14 @@ export function Pricing() {
                 className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                   tier.highlighted
                     ? "bg-pink text-white hover:bg-pink/90"
-                    : "border-2 border-border text-foreground hover:border-pink hover:bg-pink/5"
+                    : tier.comingSoon
+                      ? "border-2 border-border text-muted-foreground hover:border-pink hover:text-foreground hover:bg-pink/5"
+                      : "border-2 border-border text-foreground hover:border-pink hover:bg-pink/5"
                 }`}
               >
+                {tier.comingSoon && <Bell className="w-4 h-4" />}
                 {tier.cta}
-                <ArrowRight className="w-4 h-4" />
+                {!tier.comingSoon && <ArrowRight className="w-4 h-4" />}
               </button>
             </motion.div>
           ))}
@@ -189,13 +198,13 @@ export function Pricing() {
           viewport={{ once: true }}
           className="text-center text-sm text-muted-foreground mt-8"
         >
-          Free tier je open source a zůstane zdarma navždy. Ceny bez DPH.
+          Open source verze je plně funkční a zůstane zdarma navždy.
+          Zanechte kontakt a budete první, kdo se dozví o nových plánech.
         </motion.p>
       </div>
 
-      {/* Modals */}
-      <RegisterModal isOpen={registerOpen} onClose={() => setRegisterOpen(false)} />
-      <ContactModal isOpen={contactOpen} onClose={() => setContactOpen(false)} />
+      {/* Early Access Modal — reuses RegisterModal */}
+      <RegisterModal isOpen={earlyAccessOpen} onClose={() => setEarlyAccessOpen(false)} />
     </section>
   );
 }

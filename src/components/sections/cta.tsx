@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Github, Star, Check, Rocket, Zap } from "lucide-react";
+import { ArrowRight, Github, Star, Check, Rocket, Bell } from "lucide-react";
 import Link from "next/link";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { RegisterModal } from "@/components/forms/register-modal";
@@ -73,11 +73,11 @@ export function CTA() {
             className="text-base"
             shimmerColor="#e53e7a"
             onClick={() => {
-              trackEvent("cta_click", { target: "pro_trial" });
+              trackEvent("cta_click", { target: "early_access" });
               setRegisterOpen(true);
             }}
           >
-            <Zap className="w-4 h-4" /> Vyzkoušet Pro zdarma
+            <Bell className="w-4 h-4" /> Získat early access
             <ArrowRight className="w-4 h-4" />
           </ShimmerButton>
 
