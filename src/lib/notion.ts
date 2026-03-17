@@ -62,12 +62,38 @@ export async function createEnterpriseContact(data: {
   });
 }
 
-export async function createNewsletterSubscriber(email: string) {
+export async function checkNewsletterDuplicate(email: string): Promise<boolean> {
+  try {
+    // Notion client v5 dataSources.query uses a different endpoint than /databases/{id}/query.
+    // Use direct REST call for database query compatibility.
+    const res = await fetch(`https://api.notion.com/v1/databases/${DB_NEWSLETTER}/query`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.NOTION_API_KEY}`,
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filter: { property: "Email", email: { equals: email } },
+        page_size: 1,
+      }),
+    });
+    if (!res.ok) throw new Error(`Notion query failed: ${res.status}`);
+    const data = await res.json();
+    return data.results.length > 0;
+  } catch (error) {
+    console.error("Newsletter duplicate check error:", error);
+    return false;
+  }
+}
+
+export async function createNewsletterSubscriber(email: string, gdprConsentAt: string) {
   return notion.pages.create({
     parent: { database_id: DB_NEWSLETTER },
     properties: {
       Name: { title: [{ text: { content: email } }] },
       Email: { email },
+      "GDPR Souhlas": { date: { start: gdprConsentAt } },
       Datum: { date: { start: new Date().toISOString().split("T")[0] } },
     },
   });
